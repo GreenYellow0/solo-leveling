@@ -1,44 +1,121 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0d0d12">
     <title>Solo Leveling System</title>
-    
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div class="container">
-        <div id="login-screen">
-            <h1>System Login</h1>
-            <div class="input-group">
-                <input type="email" id="email" placeholder="Email" inputmode="email">
+    <div id="login-screen" class="container">
+        <h1>System Login</h1>
+        <div class="input-group">
+            <input type="email" id="email" placeholder="Email" inputmode="email">
+        </div>
+        <div class="input-group">
+            <input type="password" id="password" placeholder="Password">
+        </div>
+        <button id="btn-login">Initialize System</button>
+        <button id="btn-signup" class="secondary-btn">Create Account</button>
+        <p id="error-msg" class="error"></p>
+    </div>
+
+    <div id="app-screen" class="hidden">
+        
+        <nav class="navbar">
+            <div class="nav-brand">SOLO LEVELING</div>
+            <div class="hamburger" id="hamburger-btn">
+                <span></span>
+                <span></span>
+                <span></span>
             </div>
-            <div class="input-group">
-                <input type="password" id="password" placeholder="Password">
+            <ul class="nav-menu" id="nav-menu">
+                <li class="nav-item active" onclick="switchTab('status')">Player Status</li>
+                <li class="nav-item" onclick="switchTab('quests')">Daily Quests</li>
+                <li class="nav-item" onclick="switchTab('shop')">Shop</li>
+                <li class="nav-item" onclick="switchTab('inventory')">Inventory</li>
+                <li class="nav-item logout" onclick="logout()">Log Out</li>
+            </ul>
+        </nav>
+
+        <div id="tab-status" class="tab-content active-tab">
+            <div class="status-card">
+                <h2 class="rank-title" id="display-rank">E-Rank</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="label">XP</span>
+                        <span class="value" id="display-xp">0</span>
+                        <span class="sub">/ <span id="display-next">3000</span></span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">GOLD</span>
+                        <span class="value gold" id="display-gold">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">MANA</span>
+                        <span class="value blue" id="display-mana">0 💎</span> 
+                    </div>
+                </div>
             </div>
-            <button id="btn-login">Initialize System</button>
-            <button id="btn-signup" class="secondary-btn">Create Account</button>
-            <p id="error-msg" class="error"></p>
+
+            <div class="logbook-container">
+                <h3>System Log</h3>
+                <div id="logbook-list" class="logbook-list">
+                    <div class="log-entry">
+                        <span class="time">10:00</span>
+                        <span class="text">System Initialized.</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div id="app-screen" class="hidden">
-            <h1>Player Status</h1>
-            <p>Welcome, Player.</p>
+        <div id="tab-quests" class="tab-content">
+            <div class="quest-header">
+                <h3>Daily Quests</h3>
+                <button class="add-btn">+</button>
+            </div>
+            <div id="daily-list" class="quest-list">
+                <p class="empty-msg">No active quests.</p>
+            </div>
+
+            <div class="quest-header">
+                <h3>Special Quests</h3>
+                <button class="add-btn">+</button>
+            </div>
+            <div id="special-list" class="quest-list"></div>
+
+            <div class="quest-header">
+                <h3>One Time Quests</h3>
+                <button class="add-btn">+</button>
+            </div>
+        </div>
+
+        <div id="tab-shop" class="tab-content">
+            <div class="wallet-display">
+                <div class="wallet-item">Gold: <span id="shop-gold">0</span> 🪙</div>
+                <div class="wallet-item">Mana: <span id="shop-mana">0</span> 💎</div>
+            </div>
+            <button class="exchange-btn">Convert Mana to Gold</button>
             
-            <div class="status-box">
-                <p>RANK: <span id="display-rank" class="rank">Loading...</span></p>
-                <p>XP: <span id="display-xp">0</span> / <span id="display-next">Loading...</span></p>
-                <p>GOLD: <span id="display-gold">0</span></p>
+            <hr class="divider">
+            
+            <h3>Item Shop</h3>
+            <div class="shop-grid">
+                <p class="empty-msg">Shop closed (Level too low)</p>
             </div>
-
-            <button onclick="logout()" class="danger-btn">Log Out</button>
         </div>
+
+        <div id="tab-inventory" class="tab-content">
+            <h3>Inventory</h3>
+            <div class="inventory-grid">
+                <p class="empty-msg">Inventory is empty.</p>
+            </div>
+        </div>
+
     </div>
 
     <script type="module" src="game.js"></script>
