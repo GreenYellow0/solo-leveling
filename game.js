@@ -33,21 +33,17 @@ hamburgerBtn.addEventListener('click', () => {
     navMenu.classList.toggle('active');
 });
 
-// Maak switchTab globaal beschikbaar voor HTML onclicks
+// Maak switchTab globaal beschikbaar
 window.switchTab = (tabName) => {
-    // 1. Verberg alle tabs
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.remove('active-tab');
     });
-    // 2. Toon de gekozen tab
     document.getElementById('tab-' + tabName).classList.add('active-tab');
     
-    // 3. Update menu styling (welke is actief?)
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
     });
     
-    // 4. Sluit menu op mobiel na klikken
     navMenu.classList.remove('active');
 };
 
@@ -72,13 +68,12 @@ async function loadPlayerData(userId) {
         const data = docSnap.data();
         updateUI(data);
     } else {
-        // Nieuw account defaults
         const defaultData = {
             rank: "E-Rank",
             xp: 0,
             gold: 0,
             manaCrystals: 0,
-            logbook: [] // Nieuw: Logboek array
+            logbook: []
         };
         await setDoc(docRef, defaultData);
         updateUI(defaultData);
@@ -92,16 +87,15 @@ function updateUI(data) {
     document.getElementById('display-gold').innerText = data.gold;
     document.getElementById('display-mana').innerText = (data.manaCrystals || 0) + " 💎";
     
-    // Shop Scherm (kleine weergave)
+    // Shop Scherm
     document.getElementById('shop-gold').innerText = data.gold;
     document.getElementById('shop-mana').innerText = (data.manaCrystals || 0);
 
     // Logboek vullen
     const logList = document.getElementById('logbook-list');
-    logList.innerHTML = ""; // Eerst leegmaken
+    logList.innerHTML = ""; 
     
     if (data.logbook && data.logbook.length > 0) {
-        // Laatste eerst tonen (reverse)
         data.logbook.slice().reverse().forEach(entry => {
             const div = document.createElement('div');
             div.className = 'log-entry';
@@ -109,11 +103,11 @@ function updateUI(data) {
             logList.appendChild(div);
         });
     } else {
-        logList.innerHTML = "<div class='log-entry'>Geen activiteiten.</div>";
+        // HIER IS DE VERTALING AANGEPAST
+        logList.innerHTML = "<div class='log-entry'>No activity recorded.</div>";
     }
 }
 
-// Login & Signup knoppen
 document.getElementById('btn-login').addEventListener('click', () => {
     const email = document.getElementById('email').value;
     const pass = document.getElementById('password').value;

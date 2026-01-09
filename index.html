@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -35,7 +35,8 @@
             </div>
             <ul class="nav-menu" id="nav-menu">
                 <li class="nav-item active" onclick="switchTab('status')">Player Status</li>
-                <li class="nav-item" onclick="switchTab('quests')">Daily Quests</li>
+                <li class="nav-item" onclick="switchTab('quests')">Quests</li>
+                <li class="nav-item" onclick="switchTab('gates')">Gates</li>
                 <li class="nav-item" onclick="switchTab('shop')">Shop</li>
                 <li class="nav-item" onclick="switchTab('inventory')">Inventory</li>
                 <li class="nav-item logout" onclick="logout()">Log Out</li>
@@ -91,6 +92,38 @@
             <div class="quest-header">
                 <h3>One Time Quests</h3>
                 <button class="add-btn">+</button>
+            </div>
+        </div>
+
+        <div id="tab-gates" class="tab-content">
+            <h3>Dungeon Gates</h3>
+            <p class="sub-text">Select a gate to start a raid.</p>
+
+            <div class="gate-grid">
+                <button class="gate-btn rank-e">E-Rank Gate</button>
+                <button class="gate-btn rank-d">D-Rank Gate</button>
+                <button class="gate-btn rank-c">C-Rank Gate</button>
+                <button class="gate-btn rank-b">B-Rank Gate</button>
+                <button class="gate-btn rank-a">A-Rank Gate</button>
+                <button class="gate-btn rank-s">S-Rank Gate</button>
+                <button class="gate-btn rank-ss">SS-Rank Gate</button>
+                <button class="gate-btn rank-sss">SSS-Rank Gate</button>
+            </div>
+
+            <hr class="divider">
+
+            <h3>Red Gates</h3>
+            <div class="gate-container red-zone">
+                <button class="gate-btn red-gate">ENTER RED GATE ☠️</button>
+                <p class="gate-info">High Risk. 25% Success Rate.</p>
+            </div>
+
+            <hr class="divider">
+
+            <h3>Blue Gates</h3>
+            <div class="gate-container blue-zone">
+                <button class="gate-btn blue-gate">ENTER BLUE GATE 🌀</button>
+                <p class="gate-info">Bonus Dungeon. Reset: 24h.</p>
             </div>
         </div>
 

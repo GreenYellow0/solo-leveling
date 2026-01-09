@@ -4,27 +4,23 @@ body {
     color: #e0e0e0;
     font-family: 'Courier New', Courier, monospace;
     margin: 0;
-    /* Belangrijk: Geen vaste hoogte meer, zodat je kunt scrollen */
     min-height: 100vh;
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
-    /* Iets grotere tekst voor leesbaarheid */
     font-size: 18px; 
 }
 
-/* --- LOGIN SCHERM (Speciale behandeling) --- */
-/* Dit zorgt dat ALLEEN het loginscherm perfect gecentreerd is */
+/* --- LOGIN SCHERM --- */
 #login-screen {
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    height: 100vh; /* Login pakt volledig scherm */
+    height: 100vh;
     width: 100%;
     box-sizing: border-box;
 }
 
-/* De Login Box zelf */
 #login-screen .input-group, 
 #login-screen h1, 
 #login-screen button, 
@@ -36,19 +32,18 @@ body {
 #login-screen h1 {
     text-align: center;
     margin-bottom: 40px;
-    font-size: 2rem; /* Grotere titel */
+    font-size: 2rem;
     color: #3498db;
     text-transform: uppercase;
     letter-spacing: 3px;
     text-shadow: 0 0 10px rgba(52, 152, 219, 0.4);
 }
 
-/* --- APP SCHERM (Normaal scrollen) --- */
+/* --- APP SCHERM --- */
 #app-screen {
     width: 100%;
-    /* Zorgt dat inhoud niet tegen de randen plakt */
     box-sizing: border-box;
-    padding-bottom: 50px; /* Ruimte onderaan */
+    padding-bottom: 50px;
 }
 
 /* --- NAVIGATIE BALK --- */
@@ -98,11 +93,11 @@ body {
     border: 1px solid #e74c3c;
 }
 
-/* HAMBURGER MENU (Mobiel) */
+/* HAMBURGER MENU */
 .hamburger {
     display: none;
     cursor: pointer;
-    padding: 10px; /* Groter raakvlak */
+    padding: 10px;
 }
 .hamburger span {
     display: block;
@@ -113,18 +108,17 @@ body {
     transition: 0.3s;
 }
 
-/* RESPONSIVE DESIGN (Mobiel & Tablet) */
 @media (max-width: 768px) {
     .hamburger { display: block; }
     
     .nav-menu {
         position: fixed;
         left: -100%;
-        top: 70px; /* Iets lager */
+        top: 70px;
         flex-direction: column;
         background-color: #15151e;
         width: 100%;
-        height: 100vh; /* Vult hele scherm */
+        height: 100vh;
         text-align: center;
         transition: 0.3s;
         padding-top: 20px;
@@ -138,7 +132,7 @@ body {
     .nav-item {
         margin: 15px 0;
         padding: 15px;
-        font-size: 1.2rem; /* Grotere tekst in menu */
+        font-size: 1.2rem;
         border-bottom: 1px solid #2a2a35;
     }
 }
@@ -147,12 +141,12 @@ body {
 .tab-content { 
     display: none; 
     padding: 20px; 
-    max-width: 800px; /* Niet te breed op desktop */
-    margin: 0 auto;   /* Centreren op desktop */
+    max-width: 800px; 
+    margin: 0 auto;   
 }
 .active-tab { display: block; }
 
-/* PLAYER STATUS STYLING */
+/* PLAYER STATUS */
 .status-card {
     border: 1px solid #3498db;
     padding: 25px;
@@ -165,7 +159,7 @@ body {
 .rank-title {
     color: #f1c40f;
     text-align: center;
-    font-size: 2.5em; /* Lekker groot */
+    font-size: 2.5em;
     margin: 0 0 30px 0;
     text-shadow: 0 0 15px rgba(241, 196, 15, 0.6);
 }
@@ -184,6 +178,40 @@ body {
 .blue { color: #3498db; }
 .sub { font-size: 0.7em; color: #555; margin-top: 5px;}
 
+/* GATES STYLING (NIEUW) */
+.gate-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 2 kolommen */
+    gap: 15px;
+    margin-bottom: 30px;
+}
+.gate-btn {
+    padding: 20px;
+    font-size: 1em;
+    background: #15151e;
+    border: 1px solid #3498db;
+    color: #3498db;
+    margin-top: 0; /* Override algemene button margin */
+}
+.gate-btn:hover {
+    background: #3498db;
+    color: white;
+}
+.red-gate {
+    background: #2c0b0b;
+    border: 1px solid #e74c3c;
+    color: #e74c3c;
+}
+.red-gate:hover { background: #e74c3c; color: white; }
+.blue-gate {
+    background: #0b182c;
+    border: 1px solid #3498db;
+    color: #3498db;
+}
+.blue-gate:hover { background: #3498db; color: white; }
+.gate-info { font-size: 0.8em; color: #888; text-align: center; margin-top: 5px; }
+.divider { border: 0; border-top: 1px solid #333; margin: 30px 0; }
+
 /* INPUTS & KNOPPEN */
 input {
     display: block;
@@ -194,14 +222,14 @@ input {
     border: 1px solid #3498db;
     color: white;
     border-radius: 8px;
-    font-size: 18px; /* Voorkomt inzoomen op iPhone */
+    font-size: 18px;
     outline: none;
     box-sizing: border-box;
 }
 
 button {
     width: 100%;
-    padding: 16px; /* Grotere knoppen */
+    padding: 16px;
     margin-top: 15px;
     background: #1f3a93;
     color: white;
