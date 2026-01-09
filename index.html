@@ -11,6 +11,10 @@
 </head>
 <body>
 
+    <div id="notification-bar" class="notification hidden">
+        <span id="notif-text">Reward Claimed!</span>
+    </div>
+
     <div id="login-screen" class="container">
         <h1>System Login</h1>
         <div class="input-group">
@@ -29,16 +33,14 @@
         <nav class="navbar">
             <div class="nav-brand">SOLO LEVELING</div>
             <div class="hamburger" id="hamburger-btn">
-                <span></span>
-                <span></span>
-                <span></span>
+                <span></span><span></span><span></span>
             </div>
             <ul class="nav-menu" id="nav-menu">
-                <li class="nav-item active" onclick="switchTab('status')">Player Status</li>
-                <li class="nav-item" onclick="switchTab('quests')">Quests</li>
-                <li class="nav-item" onclick="switchTab('gates')">Gates</li>
-                <li class="nav-item" onclick="switchTab('shop')">Shop</li>
-                <li class="nav-item" onclick="switchTab('inventory')">Inventory</li>
+                <li id="nav-status" class="nav-item active" onclick="switchTab('status')">Player Status</li>
+                <li id="nav-quests" class="nav-item" onclick="switchTab('quests')">Quests</li>
+                <li id="nav-gates" class="nav-item" onclick="switchTab('gates')">Gates</li>
+                <li id="nav-shop" class="nav-item" onclick="switchTab('shop')">Shop</li>
+                <li id="nav-inventory" class="nav-item" onclick="switchTab('inventory')">Inventory</li>
                 <li class="nav-item logout" onclick="logout()">Log Out</li>
             </ul>
         </nav>
@@ -62,68 +64,67 @@
                     </div>
                 </div>
             </div>
-
             <div class="logbook-container">
                 <h3>System Log</h3>
-                <div id="logbook-list" class="logbook-list">
-                    <div class="log-entry">
-                        <span class="time">10:00</span>
-                        <span class="text">System Initialized.</span>
-                    </div>
-                </div>
+                <div id="logbook-list" class="logbook-list"></div>
             </div>
         </div>
 
         <div id="tab-quests" class="tab-content">
             <div class="quest-header">
                 <h3>Daily Quests</h3>
-                <button class="add-btn">+</button>
+                <button class="add-btn" onclick="openQuestModal('DAILY')">+</button>
             </div>
-            <div id="daily-list" class="quest-list">
-                <p class="empty-msg">No active quests.</p>
-            </div>
+            <div id="list-daily" class="quest-list"></div>
 
             <div class="quest-header">
                 <h3>Special Quests</h3>
-                <button class="add-btn">+</button>
+                <button class="add-btn" onclick="openQuestModal('SPECIAL')">+</button>
             </div>
-            <div id="special-list" class="quest-list"></div>
+            <div id="list-special" class="quest-list"></div>
 
             <div class="quest-header">
                 <h3>One Time Quests</h3>
-                <button class="add-btn">+</button>
+                <button class="add-btn" onclick="openQuestModal('ONE_TIME')">+</button>
             </div>
+            <div id="list-onetime" class="quest-list"></div>
         </div>
 
         <div id="tab-gates" class="tab-content">
             <h3>Dungeon Gates</h3>
-            <p class="sub-text">Select a gate to start a raid.</p>
-
-            <div class="gate-grid">
-                <button class="gate-btn rank-e">E-Rank Gate</button>
-                <button class="gate-btn rank-d">D-Rank Gate</button>
-                <button class="gate-btn rank-c">C-Rank Gate</button>
-                <button class="gate-btn rank-b">B-Rank Gate</button>
-                <button class="gate-btn rank-a">A-Rank Gate</button>
-                <button class="gate-btn rank-s">S-Rank Gate</button>
-                <button class="gate-btn rank-ss">SS-Rank Gate</button>
-                <button class="gate-btn rank-sss">SSS-Rank Gate</button>
+            
+            <div id="active-gate-panel" class="gate-status-panel hidden">
+                <h4 id="gate-timer-title">Exploring Gate...</h4>
+                <div class="timer-display" id="gate-timer">00:00</div>
+                <button id="btn-claim-gate" class="hidden" onclick="claimGateReward()">CLAIM REWARD</button>
             </div>
 
-            <hr class="divider">
+            <div id="gate-selection-grid">
+                <p class="sub-text">Select a gate to start a raid.</p>
+                <div class="gate-grid">
+                    <button class="gate-btn rank-e" onclick="startGate('E')">E-Rank Gate</button>
+                    <button class="gate-btn rank-d" onclick="startGate('D')">D-Rank Gate</button>
+                    <button class="gate-btn rank-c" onclick="startGate('C')">C-Rank Gate</button>
+                    <button class="gate-btn rank-b" onclick="startGate('B')">B-Rank Gate</button>
+                    <button class="gate-btn rank-a" onclick="startGate('A')">A-Rank Gate</button>
+                    <button class="gate-btn rank-s" onclick="startGate('S')">S-Rank Gate</button>
+                    <button class="gate-btn rank-ss" onclick="startGate('SS')">SS-Rank Gate</button>
+                    <button class="gate-btn rank-sss" onclick="startGate('SSS')">SSS-Rank Gate</button>
+                </div>
 
-            <h3>Red Gates</h3>
-            <div class="gate-container red-zone">
-                <button class="gate-btn red-gate">ENTER RED GATE ☠️</button>
-                <p class="gate-info">High Risk. 25% Success Rate.</p>
-            </div>
+                <hr class="divider">
+                <h3>Red Gates</h3>
+                <div class="gate-container red-zone">
+                    <button class="gate-btn red-gate" onclick="startGate('RED')">ENTER RED GATE ☠️</button>
+                    <p class="gate-info">High Risk. 25% Success Rate.</p>
+                </div>
 
-            <hr class="divider">
-
-            <h3>Blue Gates</h3>
-            <div class="gate-container blue-zone">
-                <button class="gate-btn blue-gate">ENTER BLUE GATE 🌀</button>
-                <p class="gate-info">Bonus Dungeon. Reset: 24h.</p>
+                <hr class="divider">
+                <h3>Blue Gates</h3>
+                <div class="gate-container blue-zone">
+                    <button class="gate-btn blue-gate" onclick="startGate('BLUE')">ENTER BLUE GATE 🌀</button>
+                    <p class="gate-info">Bonus Dungeon. Reset: 24h.</p>
+                </div>
             </div>
         </div>
 
@@ -132,13 +133,11 @@
                 <div class="wallet-item">Gold: <span id="shop-gold">0</span> 🪙</div>
                 <div class="wallet-item">Mana: <span id="shop-mana">0</span> 💎</div>
             </div>
-            <button class="exchange-btn">Convert Mana to Gold</button>
-            
+            <button class="exchange-btn" onclick="openConvertModal()">Convert Mana to Gold</button>
             <hr class="divider">
-            
             <h3>Item Shop</h3>
             <div class="shop-grid">
-                <p class="empty-msg">Shop closed (Level too low)</p>
+                <p class="empty-msg">Shop Inventory Empty</p>
             </div>
         </div>
 
@@ -148,7 +147,48 @@
                 <p class="empty-msg">Inventory is empty.</p>
             </div>
         </div>
+    </div>
 
+    <div id="modal-quest" class="modal hidden">
+        <div class="modal-content">
+            <h3>Add New Quest</h3>
+            
+            <label class="input-label">Title</label>
+            <input type="text" id="new-quest-title" placeholder="e.g. Read Book">
+            
+            <div class="reward-inputs">
+                <div>
+                    <label class="input-label">XP</label>
+                    <input type="number" id="new-quest-xp" value="20">
+                </div>
+                <div>
+                    <label class="input-label">Gold</label>
+                    <input type="number" id="new-quest-gold" value="5">
+                </div>
+                <div>
+                    <label class="input-label">Mana</label>
+                    <input type="number" id="new-quest-mana" value="0">
+                </div>
+            </div>
+            <input type="hidden" id="new-quest-type">
+            <div class="modal-actions">
+                <button onclick="closeModal('modal-quest')" class="secondary-btn">Cancel</button>
+                <button onclick="saveNewQuest()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-convert" class="modal hidden">
+        <div class="modal-content">
+            <h3>Mana Exchange</h3>
+            <p>Rate: 3 💎 = 1 🪙</p>
+            <p>Available: <span id="convert-available">0</span></p>
+            <input type="number" id="convert-amount" placeholder="Amount to sell">
+            <div class="modal-actions">
+                <button onclick="closeModal('modal-convert')" class="secondary-btn">Cancel</button>
+                <button onclick="convertMana()">Exchange</button>
+            </div>
+        </div>
     </div>
 
     <script type="module" src="game.js"></script>
