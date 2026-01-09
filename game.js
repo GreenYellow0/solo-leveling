@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// --- CONFIG ---
+// --- CONFIGURATIE (Plak hier je Key) ---
         const firebaseConfig = {
         apiKey: "AIzaSyAoP9XAGIu5sBxLHx8vjWCWjWS41ZURX30",
         authDomain: "solo-leveling-app-57b38.firebaseapp.com",
@@ -20,20 +20,7 @@ const db = getFirestore(app);
 let playerData = null;
 let gateTimerInterval = null;
 
-// GATE SETTINGS
-const GATE_DATA = {
-    'E': { minTime: 2, maxTime: 10, xp: 50, gold: 10, maxMana: 5, chance: 0.9 },
-    'D': { minTime: 2, maxTime: 10, xp: 100, gold: 15, maxMana: 8, chance: 0.8 },
-    'C': { minTime: 5, maxTime: 12, xp: 150, gold: 20, maxMana: 14, chance: 0.8 },
-    'B': { minTime: 12, maxTime: 15, xp: 200, gold: 25, maxMana: 17, chance: 0.75 },
-    'A': { minTime: 15, maxTime: 20, xp: 250, gold: 30, maxMana: 20, chance: 0.75 },
-    'S': { minTime: 30, maxTime: 30, xp: 300, gold: 40, maxMana: 50, chance: 0.75 },
-    'SS': { minTime: 60, maxTime: 60, xp: 400, gold: 50, maxMana: 100, chance: 0.70 },
-    'SSS': { minTime: 120, maxTime: 120, xp: 1000, gold: 100, maxMana: 250, chance: 0.60 },
-    'RED': { time: 0.1, xp: 200, gold: 0, minMana: 20, maxMana: 150, chance: 0.25 },
-    'BLUE': { time: 0.1, chance: 1.0 }
-};
-
+// --- SPEL DATA (Gates & Ranks) ---
 const RANKS = [
     { name: "E-Rank", min: 0, max: 3000 },
     { name: "D-Rank", min: 3000, max: 6000 },
@@ -45,57 +32,109 @@ const RANKS = [
     { name: "SSS-Rank", min: 60000, max: 150000 }
 ];
 
-// --- AUTH ---
+const GATE_DATA = {
+    'E': { minTime: 2, maxTime: 10, xp: 50, gold: 10, maxMana: 5, chance: 0.9, reqRankIdx: 0 },
+    'D': { minTime: 2, maxTime: 10, xp: 100, gold: 15, maxMana: 8, chance: 0.8, reqRankIdx: 1 },
+    'C': { minTime: 5, maxTime: 12, xp: 150, gold: 20, maxMana: 14, chance: 0.8, reqRankIdx: 2 },
+    'B': { minTime: 12, maxTime: 15, xp: 200, gold: 25, maxMana: 17, chance: 0.75, reqRankIdx: 3 },
+    'A': { minTime: 15, maxTime: 20, xp: 250, gold: 30, maxMana: 20, chance: 0.75, reqRankIdx: 4 },
+    'S': { minTime: 30, maxTime: 30, xp: 300, gold: 40, maxMana: 50, chance: 0.75, reqRankIdx: 5 },
+    'SS': { minTime: 60, maxTime: 60, xp: 400, gold: 50, maxMana: 100, chance: 0.70, reqRankIdx: 6 },
+    'SSS': { minTime: 120, maxTime: 120, xp: 1000, gold: 100, maxMana: 250, chance: 0.60, reqRankIdx: 7 },
+    'RED': { time: 10, chance: 0.25 },
+    'BLUE': { time: 0.1 }
+};
+
+// --- AUTHENTICATIE LOGICA ---
 onAuthStateChanged(auth, async (user) => {
     if (user) {
+        // Ingelogd
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('app-screen').classList.remove('hidden');
-        loadPlayerData(user.uid);
+        // We geven nu het hele user object mee (zodat we het emailadres hebben)
+        loadPlayerData(user);
     } else {
+        // Uitgelogd
         document.getElementById('login-screen').classList.remove('hidden');
         document.getElementById('app-screen').classList.add('hidden');
     }
 });
 
-// --- DATA & RESET ---
-async function loadPlayerData(userId) {
+// --- ACCOUNT MAKEN & INLOGGEN ---
+// Deze staan nu expliciet hier om zeker te zijn dat ze laden
+document.getElementById('btn-login').addEventListener('click', () => {
+    const email = document.getElementById('email').value;
+    const pass = document.getElementById('password').value;
+    if(!email || !pass) return alert("Please fill in email and password.");
+    signInWithEmailAndPassword(auth, email, pass).catch(e => alert("Login Failed: " + e.message));
+});
+
+document.getElementById('btn-signup').addEventListener('click', () => {
+    const email = document.getElementById('email').value;
+    const pass = document.getElementById('password').value;
+    if(!email || !pass) return alert("Please fill in email and password.");
+    
+    // Maak account in Firebase Auth
+    createUserWithEmailAndPassword(auth, email, pass)
+        .then((userCredential) => {
+            alert("Account Created! System Initializing...");
+            // onAuthStateChanged pikt dit vanzelf op
+        })
+        .catch((error) => {
+            alert("Signup Failed: " + error.message);
+        });
+});
+
+// --- DATA LADEN ---
+async function loadPlayerData(user) {
+    const userId = user.uid;
+    const userEmail = user.email; // Hier pakken we het emailadres
+    
     const docRef = doc(db, "players", userId);
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
         playerData = docSnap.data();
         
-        // FIX: Check of de specifieke quest er is. Zo niet, voeg toe.
-        const hasBrushQuest = playerData.quests && playerData.quests.some(q => q.title === "Brush Teeth");
-        if (!hasBrushQuest) {
-            if (!playerData.quests) playerData.quests = [];
+        // --- CHECK: Sla email op als die nog niet bestaat ---
+        if (!playerData.email) {
+            playerData.email = userEmail;
+            await saveToDB(); // Update database met email
+        }
+
+        // --- SANITIZER (NaN Fixes) ---
+        if (isNaN(playerData.xp)) playerData.xp = 0; 
+        if (isNaN(playerData.gold)) playerData.gold = 0;
+        if (isNaN(playerData.manaCrystals)) playerData.manaCrystals = 0;
+
+        // Array checks
+        if (!playerData.activeGates) playerData.activeGates = [];
+        if (!playerData.quests) playerData.quests = [];
+        
+        // Brush Teeth check
+        if (!playerData.quests.some(q => q.title === "Brush Teeth")) {
             playerData.quests.push({ id: Date.now(), title: "Brush Teeth", type: "DAILY", xp: 20, gold: 1, mana: 0, completed: false });
             await saveToDB();
         }
 
     } else {
+        // --- NIEUWE SPELER AANMAKEN ---
         playerData = {
+            email: userEmail, // HIER SLAAN WE HET EMAILADRES OP!
             rank: "E-Rank",
             xp: 0,
             gold: 0,
             manaCrystals: 0,
             lastLoginDate: new Date().toDateString(),
+            lastBlueGateDate: "",
             quests: [
                 { id: Date.now(), title: "Brush Teeth", type: "DAILY", xp: 20, gold: 1, mana: 0, completed: false }
             ],
             logbook: [],
-            activeGates: [] // NIEUW: Array voor meerdere gates
+            activeGates: []
         };
         await setDoc(docRef, playerData);
     }
-
-    // Migratie fix: Als oud account nog enkele 'activeGate' heeft, zet om naar array
-    if (playerData.activeGate && !playerData.activeGates) {
-        playerData.activeGates = [playerData.activeGate];
-        delete playerData.activeGate;
-        await saveToDB();
-    }
-    if (!playerData.activeGates) playerData.activeGates = [];
 
     checkDailyReset();
     updateUI();
@@ -117,11 +156,27 @@ async function checkDailyReset() {
     }
 }
 
-// --- MULTI GATE SYSTEM ---
+// --- GATE SYSTEM ---
 window.startGate = async (rank) => {
-    // Geen limiet meer op aantal gates, maar je mag maar 1 van dezelfde rank tegelijk doen (optioneel)
+    const userRankIndex = RANKS.findIndex(r => r.name === playerData.rank);
     
-    // Tijd berekenen
+    // Rank Check
+    if (rank !== 'RED' && rank !== 'BLUE') {
+        const gateInfo = GATE_DATA[rank];
+        if (userRankIndex < gateInfo.reqRankIdx) {
+            return alert(`Rank too low! Require: ${RANKS[gateInfo.reqRankIdx].name}.`);
+        }
+    }
+
+    // Blue Gate Check
+    if (rank === 'BLUE') {
+        const today = new Date().toDateString();
+        if (playerData.lastBlueGateDate === today) {
+            return alert("Daily Limit Reached (1/day). Reset at 00:00.");
+        }
+    }
+
+    // Tijd
     let durationMinutes = 5; 
     if (GATE_DATA[rank]) {
         const min = GATE_DATA[rank].minTime || GATE_DATA[rank].time;
@@ -131,17 +186,18 @@ window.startGate = async (rank) => {
 
     const endTime = Date.now() + (durationMinutes * 60 * 1000);
     
-    // Voeg toe aan ARRAY
     playerData.activeGates.push({
-        id: Date.now(), // Unieke ID voor deze raid
+        id: Date.now(),
         rank: rank,
         endTime: endTime
     });
 
+    if (rank === 'BLUE') playerData.lastBlueGateDate = new Date().toDateString();
+
     addToLog(`Gate: Started ${rank}-Rank Gate (${durationMinutes} min).`);
     await saveToDB();
     updateUI();
-    startTimerLoop();
+    renderActiveRaids(); 
 };
 
 window.claimGateReward = async (raidId) => {
@@ -152,31 +208,50 @@ window.claimGateReward = async (raidId) => {
     const rank = raid.rank;
     const gateInfo = GATE_DATA[rank];
     
-    // Loot Check
-    const success = Math.random() <= gateInfo.chance;
-    
+    let xpGain = 0, goldGain = 0, manaGain = 0, success = false;
+
+    // Loot Logic
+    if (rank === 'BLUE') {
+        success = true;
+        const roll = Math.random() * 100;
+        if (roll > 99) { xpGain = 1000; goldGain = 100; }
+        else if (roll > 90) { xpGain = 250; goldGain = 40; }
+        else if (roll > 60) { xpGain = 100; goldGain = 30; }
+        else if (roll > 40) { xpGain = 50; goldGain = 20; }
+        else if (roll > 20) { xpGain = 20; goldGain = 10; }
+        else { xpGain = 10; goldGain = 5; }
+    } else if (rank === 'RED') {
+        if (Math.random() <= gateInfo.chance) {
+            success = true;
+            xpGain = 200;
+            manaGain = Math.floor(Math.random() * (150 - 20 + 1)) + 20;
+        }
+    } else {
+        if (Math.random() <= gateInfo.chance) {
+            success = true;
+            xpGain = gateInfo.xp;
+            goldGain = gateInfo.gold;
+            manaGain = Math.floor(Math.random() * (gateInfo.maxMana || 5)) + 1;
+        }
+    }
+
     if (success) {
-        const mana = Math.floor(Math.random() * (gateInfo.maxMana || 5)) + 1;
-        addRewards(gateInfo.xp, gateInfo.gold, mana, `Gate Cleared: ${rank}-Rank`);
+        addRewards(xpGain, goldGain, manaGain, `Gate Cleared: ${rank}-Rank`);
     } else {
         addToLog(`Gate Failed: ${rank}-Rank (No Loot).`);
         showNotification("Raid Failed...");
     }
 
-    // Verwijder uit array
     playerData.activeGates.splice(raidIndex, 1);
-    
     await saveToDB();
     updateUI();
+    renderActiveRaids();
 };
 
 function startTimerLoop() {
     if (gateTimerInterval) clearInterval(gateTimerInterval);
     gateTimerInterval = setInterval(() => {
-        if (!playerData.activeGates || playerData.activeGates.length === 0) {
-            // Niet stoppen, want misschien start je er zo een
-            return; 
-        }
+        if (!playerData.activeGates || playerData.activeGates.length === 0) return;
         renderActiveRaids();
     }, 1000);
     renderActiveRaids();
@@ -185,37 +260,25 @@ function startTimerLoop() {
 function renderActiveRaids() {
     const container = document.getElementById('active-raids-container');
     container.innerHTML = "";
-    
     if (!playerData.activeGates || playerData.activeGates.length === 0) return;
 
     const now = Date.now();
-
     playerData.activeGates.forEach(raid => {
         const timeLeft = raid.endTime - now;
         let html = "";
         
         if (timeLeft <= 0) {
-            // READY TO CLAIM
             html = `
-            <div class="raid-card">
-                <div class="raid-info">
-                    <span class="raid-title">${raid.rank}-Rank Gate</span>
-                    <span class="raid-timer" style="color:#f1c40f">DONE</span>
-                </div>
+            <div class="raid-card" style="border-color: #f1c40f;">
+                <div class="raid-info"><span class="raid-title">${raid.rank}-Rank Gate</span><span class="raid-timer" style="color:#f1c40f">DONE</span></div>
                 <button class="claim-btn" onclick="claimGateReward(${raid.id})">CLAIM</button>
             </div>`;
         } else {
-            // RUNNING
             const m = Math.floor((timeLeft / 1000 / 60) % 60);
             const s = Math.floor((timeLeft / 1000) % 60);
-            const timeString = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-            
             html = `
             <div class="raid-card">
-                <div class="raid-info">
-                    <span class="raid-title">${raid.rank}-Rank Gate</span>
-                    <span class="raid-timer">${timeString}</span>
-                </div>
+                <div class="raid-info"><span class="raid-title">${raid.rank}-Rank Gate</span><span class="raid-timer">${m}:${s.toString().padStart(2,'0')}</span></div>
                 <span style="color:#888; font-size:0.8em;">EXPLORING...</span>
             </div>`;
         }
@@ -223,27 +286,25 @@ function renderActiveRaids() {
     });
 }
 
-// --- MANA & SHOP ---
+// --- MANA & QUESTS ---
 window.convertMana = async () => {
     const amount = parseInt(document.getElementById('convert-amount').value);
     if (!amount || amount <= 0) return;
     if (playerData.manaCrystals < amount) return alert("Not enough Mana!");
+    
     const usedMana = amount - (amount % 3);
     const goldGained = usedMana / 3;
     if (goldGained === 0) return alert("Need at least 3 Mana.");
 
     playerData.manaCrystals -= usedMana;
     playerData.gold += goldGained;
-    
     addToLog(`Shop: Traded ${usedMana} Mana for ${goldGained} Gold.`);
     showNotification(`+${goldGained} Gold`);
-    
     await saveToDB();
     closeModal('modal-convert');
     updateUI();
 };
 
-// --- QUESTS ---
 window.saveNewQuest = async () => {
     const title = document.getElementById('new-quest-title').value;
     const xp = parseInt(document.getElementById('new-quest-xp').value) || 0;
@@ -269,7 +330,7 @@ window.toggleQuest = async (id) => {
     updateUI();
 };
 
-// --- HELPERS (LOG FIX: Nu met details!) ---
+// --- HELPERS ---
 function addRewards(xp, gold, mana, reason) {
     playerData.xp += xp;
     playerData.gold += gold;
@@ -289,8 +350,7 @@ function addRewards(xp, gold, mana, reason) {
     if (mana > 0) notifText += ` | +${mana} Mana`;
     showNotification(notifText);
     
-    // LOGBOEK DETAIL FIX
-    const details = `(+${xp} XP, +${gold} Gold${mana ? `, +${mana} Mana` : ''})`;
+    const details = `(+${xp}XP, +${gold}G${mana ? `, +${mana}Mana` : ''})`;
     addToLog(`${reason} ${details}`);
 }
 
@@ -313,17 +373,19 @@ function showNotification(text) {
     setTimeout(() => n.classList.add('hidden'), 5000);
 }
 
-// --- UI UPDATE ---
 function updateUI() {
+    const xp = isNaN(playerData.xp) ? 0 : playerData.xp;
+    const gold = isNaN(playerData.gold) ? 0 : playerData.gold;
+
     document.getElementById('display-rank').innerText = playerData.rank;
-    document.getElementById('display-xp').innerText = playerData.xp;
-    document.getElementById('display-gold').innerText = playerData.gold;
+    document.getElementById('display-xp').innerText = xp;
+    document.getElementById('display-gold').innerText = gold;
     document.getElementById('display-mana').innerText = (playerData.manaCrystals || 0) + " 💎";
     
     const currentRank = RANKS.find(r => r.name === playerData.rank);
     if (currentRank) document.getElementById('display-next').innerText = currentRank.max;
 
-    document.getElementById('shop-gold').innerText = playerData.gold;
+    document.getElementById('shop-gold').innerText = gold;
     document.getElementById('shop-mana').innerText = (playerData.manaCrystals || 0);
 
     if (playerData.quests) {
@@ -360,14 +422,10 @@ function renderList(id, type) {
     });
 }
 
-// --- EVENTS ---
+// --- EVENT LISTENERS ---
 window.openQuestModal = (t) => { document.getElementById('new-quest-type').value = t; document.getElementById('modal-quest').classList.remove('hidden'); };
 window.openConvertModal = () => { document.getElementById('convert-available').innerText = playerData.manaCrystals || 0; document.getElementById('modal-convert').classList.remove('hidden'); };
 window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
-document.getElementById('btn-login').addEventListener('click', () => {
-    const email = document.getElementById('email').value; const pass = document.getElementById('password').value;
-    signInWithEmailAndPassword(auth, email, pass).catch(e => alert(e.message));
-});
 window.logout = () => signOut(auth);
 window.switchTab = (tabName) => {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active-tab'));
