@@ -1,4 +1,4 @@
-/* --- BASIS --- */
+/* --- BASIS (BEHOUDEN) --- */
 body {
     background-color: #0d0d12; color: #e0e0e0; font-family: 'Courier New', Courier, monospace;
     margin: 0; min-height: 100vh; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
@@ -62,13 +62,22 @@ body {
 .quest-item.completed { opacity: 0.5; border-left: 4px solid #444; }
 .quest-info h4 { margin: 0; font-size: 1rem; }
 .quest-rewards { font-size: 0.8em; color: #f1c40f; margin-top: 5px; }
+.quest-desc { font-size: 0.8em; color: #aaa; margin-top: 4px; font-style: italic; max-width: 200px; }
 
-/* QUEST ACTIONS (Vinkje + Delete) */
-.quest-actions { display: flex; gap: 10px; align-items: center; }
-.checkbox-btn { width: 30px; height: 30px; border: 2px solid #3498db; background: transparent; cursor: pointer; border-radius: 50%; padding: 0; margin: 0; }
+/* FIX: Z-Index toegevoegd zodat knoppen altijd klikbaar zijn */
+.quest-actions { display: flex; gap: 15px; align-items: center; z-index: 10; position: relative; }
+
+.checkbox-btn { 
+    width: 30px; height: 30px; border: 2px solid #3498db; background: transparent; 
+    cursor: pointer; border-radius: 50%; padding: 0; margin: 0; 
+}
 .quest-item.completed .checkbox-btn { background: #3498db; }
-.delete-btn { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; padding: 0; width: auto; margin: 0; opacity: 0.6; }
-.delete-btn:hover { opacity: 1; transform: scale(1.1); }
+
+.delete-btn { 
+    background: transparent; border: none; font-size: 1.2rem; cursor: pointer; 
+    padding: 0; width: auto; margin: 0; opacity: 0.6; 
+}
+.delete-btn:hover { opacity: 1; transform: scale(1.1); color: #e74c3c; }
 
 /* GATES */
 .gate-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px; }
@@ -80,13 +89,7 @@ body {
 .blue-gate:hover { background: #3498db; color: white; }
 .gate-info { font-size: 0.8em; color: #888; text-align: center; margin-top: 5px; }
 .divider { border: 0; border-top: 1px solid #333; margin: 30px 0; }
-
-.raid-card {
-    background: #15151e; border: 1px solid #f1c40f; padding: 15px;
-    border-radius: 8px; margin-bottom: 10px; display: flex;
-    justify-content: space-between; align-items: center;
-    box-shadow: 0 0 10px rgba(241, 196, 15, 0.1);
-}
+.raid-card { background: #15151e; border: 1px solid #f1c40f; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 0 10px rgba(241, 196, 15, 0.1); }
 .raid-info { display: flex; flex-direction: column; }
 .raid-title { font-weight: bold; color: #f1c40f; font-size: 1.1em; }
 .raid-timer { color: #fff; font-family: monospace; font-size: 1.2em; margin-top: 5px; }
@@ -94,7 +97,8 @@ body {
 @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
 /* INPUTS */
-input { display: block; width: 100%; padding: 15px; margin: 5px 0 15px 0; background: #1a1a24; border: 1px solid #3498db; color: white; border-radius: 8px; font-size: 18px; outline: none; box-sizing: border-box; }
+input, textarea { display: block; width: 100%; padding: 15px; margin: 5px 0 15px 0; background: #1a1a24; border: 1px solid #3498db; color: white; border-radius: 8px; font-size: 18px; outline: none; box-sizing: border-box; font-family: inherit; }
+textarea { resize: vertical; min-height: 60px; }
 .input-label { font-size: 0.8em; color: #888; margin-left: 2px; }
 button { width: 100%; padding: 16px; margin-top: 15px; background: #1f3a93; color: white; border: none; cursor: pointer; font-weight: bold; text-transform: uppercase; border-radius: 8px; font-size: 1.1rem; letter-spacing: 1px; }
 button:hover { background: #2c56d4; }

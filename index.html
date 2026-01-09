@@ -78,7 +78,7 @@
             <div id="list-daily" class="quest-list"></div>
 
             <div class="quest-header">
-                <h3>Special Quests</h3>
+                <h3>Special Quests (3 Days)</h3>
                 <button class="add-btn" onclick="openQuestModal('SPECIAL')">+</button>
             </div>
             <div id="list-special" class="quest-list"></div>
@@ -93,8 +93,7 @@
         <div id="tab-gates" class="tab-content">
             <h3>Dungeon Gates</h3>
             
-            <div id="active-raids-container">
-                </div>
+            <div id="active-raids-container"></div>
 
             <div id="gate-selection-grid">
                 <p class="sub-text">Select a gate to start a raid.</p>
@@ -149,8 +148,13 @@
     <div id="modal-quest" class="modal hidden">
         <div class="modal-content">
             <h3>Add New Quest</h3>
+            
             <label class="input-label">Title</label>
             <input type="text" id="new-quest-title" placeholder="e.g. Read Book">
+            
+            <label class="input-label">Description (Optional)</label>
+            <textarea id="new-quest-desc" placeholder="Details about this quest..."></textarea>
+
             <div class="reward-inputs">
                 <div><label class="input-label">XP</label><input type="number" id="new-quest-xp" value="20"></div>
                 <div><label class="input-label">Gold</label><input type="number" id="new-quest-gold" value="5"></div>

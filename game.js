@@ -12,7 +12,6 @@ import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstati
         appId: "1:715704809890:web:69e2ba6af16d0933e39afb"
         };
 
-
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -46,68 +45,11 @@ const GATE_DATA = {
     'BLUE': { time: 0.1 }
 };
 
-// --- AUTH LOGIC (LOGIN & SIGNUP FIX) ---
-
-// Inloggen
-document.getElementById('btn-login').addEventListener('click', () => {
-    const email = document.getElementById('email').value;
-    const pass = document.getElementById('password').value;
-    if(!email || !pass) return alert("Fill in all fields");
-    
-    document.getElementById('btn-login').innerText = "Loading...";
-    signInWithEmailAndPassword(auth, email, pass).catch(e => {
-        alert(e.message);
-        document.getElementById('btn-login').innerText = "Initialize System";
-    });
-});
-
-// Account Maken (NU MET EMAIL OPSLAG FIX)
-document.getElementById('btn-signup').addEventListener('click', async () => {
-    const email = document.getElementById('email').value;
-    const pass = document.getElementById('password').value;
-    if(!email || !pass) return alert("Fill in all fields");
-
-    document.getElementById('btn-signup').innerText = "Creating...";
-
-    try {
-        // 1. Maak user in Auth
-        const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-        const user = userCredential.user;
-
-        // 2. Maak DIRECT het document aan in Database met email
-        const newPlayerData = {
-            email: user.email, // Forceer email opslag
-            rank: "E-Rank",
-            xp: 0,
-            gold: 0,
-            manaCrystals: 0,
-            lastLoginDate: new Date().toDateString(),
-            lastBlueGateDate: "",
-            quests: [
-                { id: Date.now(), title: "Brush Teeth", type: "DAILY", xp: 20, gold: 1, mana: 0, completed: false }
-            ],
-            logbook: [],
-            activeGates: []
-        };
-
-        await setDoc(doc(db, "players", user.uid), newPlayerData);
-        
-        // 3. Auth Listener doet de rest (scherm wisselen)
-
-    } catch (error) {
-        alert("Signup Error: " + error.message);
-        document.getElementById('btn-signup').innerText = "Create Account";
-    }
-});
-
-// Listener voor status wijziging
+// --- AUTH ---
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('app-screen').classList.remove('hidden');
-        // Reset knop teksten
-        document.getElementById('btn-login').innerText = "Initialize System";
-        document.getElementById('btn-signup').innerText = "Create Account";
         loadPlayerData(user);
     } else {
         document.getElementById('login-screen').classList.remove('hidden');
@@ -115,7 +57,7 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// --- DATA LOAD ---
+// --- LOAD & REPAIR DATA ---
 async function loadPlayerData(user) {
     const docRef = doc(db, "players", user.uid);
     const docSnap = await getDoc(docRef);
@@ -123,28 +65,32 @@ async function loadPlayerData(user) {
     if (docSnap.exists()) {
         playerData = docSnap.data();
 
-        // Check of email erin staat, zo niet, voeg toe
-        if (!playerData.email) {
-            playerData.email = user.email;
-            await saveToDB();
+        // 1. REPARATIE: Zorg dat alle IDs Strings zijn
+        if (playerData.quests) {
+            playerData.quests.forEach(q => {
+                if (typeof q.id === 'number') q.id = "fix_" + q.id;
+            });
+        }
+        if (playerData.activeGates) {
+            playerData.activeGates.forEach(g => {
+                if (typeof g.id === 'number') g.id = "fix_" + g.id;
+            });
         }
 
-        // Repareer NaN
-        if (isNaN(playerData.xp)) playerData.xp = 0; 
+        // 2. Data checks
+        if (!playerData.email) playerData.email = user.email;
+        if (isNaN(playerData.xp)) playerData.xp = 0;
         if (isNaN(playerData.gold)) playerData.gold = 0;
-        if (isNaN(playerData.manaCrystals)) playerData.manaCrystals = 0;
-
-        if (!playerData.activeGates) playerData.activeGates = [];
+        if (!playerData.logbook) playerData.logbook = [];
         if (!playerData.quests) playerData.quests = [];
-        
-        // Brush Teeth Check
-        if (!playerData.quests.some(q => q.title === "Brush Teeth")) {
-            playerData.quests.push({ id: Date.now(), title: "Brush Teeth", type: "DAILY", xp: 20, gold: 1, mana: 0, completed: false });
-            await saveToDB();
-        }
+        if (!playerData.activeGates) playerData.activeGates = [];
+        if (!playerData.lastSpecialDate) playerData.lastSpecialDate = new Date().toDateString();
+
+        // 3. Opslaan
+        await saveToDB();
 
     } else {
-        // Fallback als document toch niet bestaat (zou niet moeten gebeuren door signup fix)
+        // Nieuw account
         playerData = {
             email: user.email,
             rank: "E-Rank",
@@ -152,202 +98,302 @@ async function loadPlayerData(user) {
             gold: 0,
             manaCrystals: 0,
             lastLoginDate: new Date().toDateString(),
+            lastSpecialDate: new Date().toDateString(),
             quests: [],
-            activeGates: []
+            activeGates: [],
+            logbook: []
         };
         await setDoc(docRef, playerData);
     }
 
-    checkDailyReset();
+    checkResetLogic();
     updateUI();
     startTimerLoop();
 }
 
-async function checkDailyReset() {
-    const today = new Date().toDateString();
-    if (playerData.lastLoginDate !== today) {
+async function checkResetLogic() {
+    const today = new Date();
+    const todayStr = today.toDateString();
+    let updated = false;
+
+    // Daily Reset
+    if (playerData.lastLoginDate !== todayStr) {
         let count = 0;
-        if (playerData.quests) {
-            playerData.quests.forEach(q => {
-                if (q.type === 'DAILY') { q.completed = false; count++; }
-            });
-        }
-        if (count > 0) addToLog(`System Reset: ${count} Daily Quests restored.`);
-        playerData.lastLoginDate = today;
-        await saveToDB();
+        playerData.quests.forEach(q => {
+            if (q.type === 'DAILY') { q.completed = false; count++; }
+        });
+        if (count > 0) addToLog(`Reset: ${count} Daily Quests.`);
+        playerData.lastLoginDate = todayStr;
+        updated = true;
     }
+
+    // Special Reset (3 dagen)
+    const lastSpec = new Date(playerData.lastSpecialDate);
+    const diffTime = Math.abs(today - lastSpec);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+    if (diffDays >= 3) {
+        let count = 0;
+        playerData.quests.forEach(q => {
+            if (q.type === 'SPECIAL') { q.completed = false; count++; }
+        });
+        if (count > 0) addToLog(`Reset: ${count} Special Quests.`);
+        playerData.lastSpecialDate = todayStr;
+        updated = true;
+    }
+
+    if (updated) await saveToDB();
 }
 
-// --- GATE SYSTEM (SLOT FIX) ---
-window.startGate = async (rank) => {
-    // 1. SLOT CHECK (1 Rank, 1 Red, 1 Blue)
-    const activeRanked = playerData.activeGates.find(g => !['RED', 'BLUE'].includes(g.rank));
-    const activeRed = playerData.activeGates.find(g => g.rank === 'RED');
-    const activeBlue = playerData.activeGates.find(g => g.rank === 'BLUE');
-
-    if (rank === 'RED' && activeRed) return alert("Red Gate already active!");
-    if (rank === 'BLUE' && activeBlue) return alert("Blue Gate already active!");
-    if (rank !== 'RED' && rank !== 'BLUE' && activeRanked) return alert("You are already exploring a Ranked Gate!");
-
-    // 2. LEVEL CHECK
-    const userRankIndex = RANKS.findIndex(r => r.name === playerData.rank);
-    if (rank !== 'RED' && rank !== 'BLUE') {
-        const gateInfo = GATE_DATA[rank];
-        if (userRankIndex < gateInfo.reqRankIdx) {
-            return alert(`Rank too low! Require: ${RANKS[gateInfo.reqRankIdx].name}.`);
+// --- QUESTS ---
+window.toggleQuest = async (id) => {
+    try {
+        console.log("Attempting toggleQuest ID:", id);
+        const q = playerData.quests.find(x => String(x.id) === String(id));
+        if (!q) {
+            console.error("Quest not found for ID:", id);
+            return;
         }
+        if (q.completed) return;
+
+        q.completed = true;
+        addRewards(q.xp, q.gold, q.mana, `Quest: ${q.title}`);
+        
+        await saveToDB();
+        updateUI();
+    } catch (e) {
+        console.error("Error in toggleQuest:", e);
+        alert("System Error: Could not complete quest.");
     }
-
-    // 3. DAILY BLUE CHECK
-    if (rank === 'BLUE') {
-        const today = new Date().toDateString();
-        if (playerData.lastBlueGateDate === today) return alert("Daily Limit Reached (1/day).");
-    }
-
-    // 4. TIJD
-    let durationMinutes = 5; 
-    if (GATE_DATA[rank]) {
-        const min = GATE_DATA[rank].minTime || GATE_DATA[rank].time;
-        const max = GATE_DATA[rank].maxTime || GATE_DATA[rank].time;
-        durationMinutes = Math.floor(Math.random() * (max - min + 1)) + min;
-    }
-
-    const endTime = Date.now() + (durationMinutes * 60 * 1000);
-    
-    playerData.activeGates.push({
-        id: Date.now(),
-        rank: rank,
-        endTime: endTime
-    });
-
-    if (rank === 'BLUE') playerData.lastBlueGateDate = new Date().toDateString();
-
-    addToLog(`Gate: Started ${rank}-Rank Gate (${durationMinutes} min).`);
-    await saveToDB();
-    updateUI();
-    renderActiveRaids(); 
 };
 
-window.claimGateReward = async (raidId) => {
-    const raidIndex = playerData.activeGates.findIndex(g => g.id === raidId);
-    if (raidIndex === -1) return;
-    
-    const raid = playerData.activeGates[raidIndex];
-    const rank = raid.rank;
-    const gateInfo = GATE_DATA[rank];
-    
-    let xpGain = 0, goldGain = 0, manaGain = 0, success = false;
-
-    if (rank === 'BLUE') {
-        success = true;
-        const roll = Math.random() * 100;
-        if (roll > 99) { xpGain = 1000; goldGain = 100; }
-        else if (roll > 90) { xpGain = 250; goldGain = 40; }
-        else if (roll > 60) { xpGain = 100; goldGain = 30; }
-        else if (roll > 40) { xpGain = 50; goldGain = 20; }
-        else if (roll > 20) { xpGain = 20; goldGain = 10; }
-        else { xpGain = 10; goldGain = 5; }
-    } else if (rank === 'RED') {
-        if (Math.random() <= gateInfo.chance) {
-            success = true;
-            xpGain = 200;
-            manaGain = Math.floor(Math.random() * (150 - 20 + 1)) + 20;
-        }
-    } else {
-        if (Math.random() <= gateInfo.chance) {
-            success = true;
-            xpGain = gateInfo.xp;
-            goldGain = gateInfo.gold;
-            manaGain = Math.floor(Math.random() * (gateInfo.maxMana || 5)) + 1;
-        }
-    }
-
-    if (success) {
-        addRewards(xpGain, goldGain, manaGain, `Gate Cleared: ${rank}-Rank`);
-    } else {
-        addToLog(`Gate Failed: ${rank}-Rank (No Loot).`);
-        showNotification("Raid Failed...");
-    }
-
-    playerData.activeGates.splice(raidIndex, 1);
+window.deleteQuest = async (id) => {
+    if(!confirm("Delete this quest?")) return;
+    playerData.quests = playerData.quests.filter(x => String(x.id) !== String(id));
     await saveToDB();
     updateUI();
-    renderActiveRaids();
 };
 
-// --- QUESTS (DELETE FUNCTIE) ---
 window.saveNewQuest = async () => {
     const title = document.getElementById('new-quest-title').value;
+    const desc = document.getElementById('new-quest-desc').value;
     const xp = parseInt(document.getElementById('new-quest-xp').value) || 0;
     const gold = parseInt(document.getElementById('new-quest-gold').value) || 0;
     const mana = parseInt(document.getElementById('new-quest-mana').value) || 0;
     const type = document.getElementById('new-quest-type').value;
 
     if (!title) return alert("Title required");
-    const newQuest = { id: Date.now(), title, type, xp, gold, mana, completed: false };
-    if (!playerData.quests) playerData.quests = [];
+    
+    // --- HIER IS DE FIX: GEEN NEGATIEVE CIJFERS ---
+    if (xp < 0 || gold < 0 || mana < 0) {
+        return alert("Rewards cannot be negative!");
+    }
+    
+    // Altijd ID als string opslaan
+    const newQuest = { 
+        id: "quest_" + Date.now(), 
+        title, desc, type, xp, gold, mana, completed: false 
+    };
+    
     playerData.quests.push(newQuest);
     await saveToDB();
     closeModal('modal-quest');
     updateUI();
 };
 
-window.toggleQuest = async (id) => {
-    const q = playerData.quests.find(x => x.id === id);
-    if (!q || q.completed) return;
-    q.completed = true;
-    addRewards(q.xp, q.gold, q.mana, `Quest: ${q.title}`);
+// --- GATES ---
+window.startGate = async (rank) => {
+    // Check Slots
+    const activeRanked = playerData.activeGates.find(g => !['RED', 'BLUE'].includes(g.rank));
+    const activeRed = playerData.activeGates.find(g => g.rank === 'RED');
+    const activeBlue = playerData.activeGates.find(g => g.rank === 'BLUE');
+
+    if (rank === 'RED' && activeRed) return alert("Red Gate active!");
+    if (rank === 'BLUE' && activeBlue) return alert("Blue Gate active!");
+    if (rank !== 'RED' && rank !== 'BLUE' && activeRanked) return alert("Ranked Gate active!");
+
+    // Rank Check
+    const userRankIdx = RANKS.findIndex(r => r.name === playerData.rank);
+    if (rank !== 'RED' && rank !== 'BLUE') {
+        const info = GATE_DATA[rank];
+        if (userRankIdx < info.reqRankIdx) return alert("Rank too low!");
+    }
+
+    // Daily Blue Check
+    if (rank === 'BLUE') {
+        if (playerData.lastBlueGateDate === new Date().toDateString()) return alert("Limit: 1 Blue Gate/Day.");
+    }
+
+    // Tijd
+    let minutes = 5;
+    if (GATE_DATA[rank]) {
+        const d = GATE_DATA[rank];
+        const min = d.minTime || d.time;
+        const max = d.maxTime || d.time;
+        minutes = Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    const endTime = Date.now() + (minutes * 60 * 1000);
+    // Voeg toe (ID als string)
+    playerData.activeGates.push({ id: "raid_" + Date.now(), rank: rank, endTime: endTime });
+
+    if (rank === 'BLUE') playerData.lastBlueGateDate = new Date().toDateString();
+
+    addToLog(`Started ${rank}-Rank Gate (${minutes}m).`);
     await saveToDB();
     updateUI();
+    renderActiveRaids();
 };
 
-// NIEUWE FUNCTIE: VERWIJDEREN
-window.deleteQuest = async (id) => {
-    if(!confirm("Delete this quest?")) return;
-    playerData.quests = playerData.quests.filter(q => q.id !== id);
-    await saveToDB();
-    updateUI();
+window.claimGateReward = async (raidId) => {
+    try {
+        const idx = playerData.activeGates.findIndex(g => String(g.id) === String(raidId));
+        if (idx === -1) {
+            console.error("Raid not found:", raidId);
+            return;
+        }
+
+        const raid = playerData.activeGates[idx];
+        const rank = raid.rank;
+        const info = GATE_DATA[rank];
+        
+        let xp=0, gold=0, mana=0, success=false;
+
+        // Loot Logic
+        if (rank === 'BLUE') {
+            success = true;
+            const r = Math.random() * 100;
+            if (r>99) { xp=1000; gold=100; }
+            else if (r>90) { xp=250; gold=40; }
+            else if (r>60) { xp=100; gold=30; }
+            else if (r>40) { xp=50; gold=20; }
+            else if (r>20) { xp=20; gold=10; }
+            else { xp=10; gold=5; }
+        } else if (rank === 'RED') {
+            if (Math.random() <= info.chance) {
+                success = true; xp=200; 
+                mana = Math.floor(Math.random()*(150-20+1))+20;
+            }
+        } else {
+            if (Math.random() <= info.chance) {
+                success = true; xp=info.xp; gold=info.gold;
+                mana = Math.floor(Math.random()*(info.maxMana||5))+1;
+            }
+        }
+
+        if (success) addRewards(xp, gold, mana, `Gate Cleared: ${rank}`);
+        else {
+            addToLog(`Gate Failed: ${rank}`);
+            showNotification("Raid Failed...");
+        }
+
+        playerData.activeGates.splice(idx, 1);
+        await saveToDB();
+        updateUI();
+        renderActiveRaids();
+
+    } catch (e) {
+        console.error("Claim Error:", e);
+        alert("Claim failed.");
+    }
 };
 
-// --- HELPERS & UI ---
+// --- HELPERS ---
 function addRewards(xp, gold, mana, reason) {
     playerData.xp += xp;
     playerData.gold += gold;
     if (mana) playerData.manaCrystals += mana;
 
-    const curRank = RANKS.find(r => r.name === playerData.rank);
-    if (curRank && playerData.xp >= curRank.max) {
-        const next = RANKS.find(r => r.min === curRank.max);
+    const cur = RANKS.find(r => r.name === playerData.rank);
+    if (cur && playerData.xp >= cur.max) {
+        const next = RANKS.find(r => r.min === cur.max);
         if (next) {
             playerData.rank = next.name;
             showNotification(`RANK UP! ${next.name}`);
             addToLog(`Promoted to ${next.name}`);
         }
     }
-    
-    let notifText = `+${xp} XP | +${gold} Gold`;
-    if (mana > 0) notifText += ` | +${mana} Mana`;
-    showNotification(notifText);
-    const details = `(+${xp}XP, +${gold}G${mana ? `, +${mana}Mana` : ''})`;
-    addToLog(`${reason} ${details}`);
+
+    let msg = `+${xp} XP | +${gold} Gold`;
+    if (mana) msg += ` | +${mana} Mana`;
+    showNotification(msg);
+    addToLog(`${reason} (${msg})`);
 }
 
 function addToLog(msg) {
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
     if (!playerData.logbook) playerData.logbook = [];
-    playerData.logbook.push({ time, msg });
+    playerData.logbook.push({time, msg});
     if (playerData.logbook.length > 50) playerData.logbook.shift();
 }
 
 async function saveToDB() {
-    const docRef = doc(db, "players", auth.currentUser.uid);
-    await updateDoc(docRef, playerData);
+    if (!auth.currentUser) return;
+    await updateDoc(doc(db, "players", auth.currentUser.uid), playerData);
+}
+
+function updateUI() {
+    if (!playerData) return;
+    
+    document.getElementById('display-rank').innerText = playerData.rank;
+    document.getElementById('display-xp').innerText = playerData.xp || 0;
+    document.getElementById('display-gold').innerText = playerData.gold || 0;
+    document.getElementById('display-mana').innerText = (playerData.manaCrystals || 0) + " 💎";
+    
+    const currentRank = RANKS.find(r => r.name === playerData.rank);
+    if (currentRank) document.getElementById('display-next').innerText = currentRank.max;
+
+    document.getElementById('shop-gold').innerText = playerData.gold || 0;
+    document.getElementById('shop-mana').innerText = (playerData.manaCrystals || 0);
+
+    renderList('list-daily', 'DAILY');
+    renderList('list-special', 'SPECIAL');
+    renderList('list-onetime', 'ONE_TIME');
+
+    const logList = document.getElementById('logbook-list');
+    logList.innerHTML = "";
+    if (playerData.logbook) {
+        playerData.logbook.slice().reverse().forEach(e => {
+            logList.innerHTML += `<div class='log-entry'><span class="time">${e.time}</span> <span class="text">${e.msg}</span></div>`;
+        });
+    }
+}
+
+function renderList(id, type) {
+    const list = document.getElementById(id);
+    list.innerHTML = "";
+    const items = playerData.quests.filter(q => q.type === type);
+    
+    if (items.length === 0) {
+        list.innerHTML = `<p class="empty-msg">No quests.</p>`;
+        return;
+    }
+    
+    items.forEach(q => {
+        const cls = q.completed ? 'completed' : '';
+        let rewards = `XP: ${q.xp} | Gold: ${q.gold}`;
+        if (q.mana > 0) rewards += ` | Mana: ${q.mana}`;
+        const descHtml = q.desc ? `<p class="quest-desc">${q.desc}</p>` : '';
+
+        // STRING ID FIX: '${q.id}'
+        list.innerHTML += `
+            <div class="quest-item ${cls}">
+                <div class="quest-info">
+                    <h4>${q.title}</h4>
+                    ${descHtml}
+                    <div class="quest-rewards">${rewards}</div>
+                </div>
+                <div class="quest-actions">
+                    <button class="delete-btn" onclick="deleteQuest('${q.id}')">🗑️</button>
+                    <button class="checkbox-btn" onclick="toggleQuest('${q.id}')"></button>
+                </div>
+            </div>`;
+    });
 }
 
 function startTimerLoop() {
     if (gateTimerInterval) clearInterval(gateTimerInterval);
     gateTimerInterval = setInterval(() => {
-        if (!playerData.activeGates || playerData.activeGates.length === 0) return;
+        if (!playerData.activeGates) return;
         renderActiveRaids();
     }, 1000);
     renderActiveRaids();
@@ -357,15 +403,17 @@ function renderActiveRaids() {
     const container = document.getElementById('active-raids-container');
     container.innerHTML = "";
     if (!playerData.activeGates || playerData.activeGates.length === 0) return;
+    
     const now = Date.now();
     playerData.activeGates.forEach(raid => {
         const timeLeft = raid.endTime - now;
         let html = "";
+        // ID doorgeven met quotes '${raid.id}'
         if (timeLeft <= 0) {
             html = `
             <div class="raid-card" style="border-color: #f1c40f;">
                 <div class="raid-info"><span class="raid-title">${raid.rank}-Rank Gate</span><span class="raid-timer" style="color:#f1c40f">DONE</span></div>
-                <button class="claim-btn" onclick="claimGateReward(${raid.id})">CLAIM</button>
+                <button class="claim-btn" onclick="claimGateReward('${raid.id}')">CLAIM</button>
             </div>`;
         } else {
             const m = Math.floor((timeLeft / 1000 / 60) % 60);
@@ -380,84 +428,56 @@ function renderActiveRaids() {
     });
 }
 
-function updateUI() {
-    const xp = isNaN(playerData.xp) ? 0 : playerData.xp;
-    const gold = isNaN(playerData.gold) ? 0 : playerData.gold;
-
-    document.getElementById('display-rank').innerText = playerData.rank;
-    document.getElementById('display-xp').innerText = xp;
-    document.getElementById('display-gold').innerText = gold;
-    document.getElementById('display-mana').innerText = (playerData.manaCrystals || 0) + " 💎";
-    
-    const currentRank = RANKS.find(r => r.name === playerData.rank);
-    if (currentRank) document.getElementById('display-next').innerText = currentRank.max;
-
-    document.getElementById('shop-gold').innerText = gold;
-    document.getElementById('shop-mana').innerText = (playerData.manaCrystals || 0);
-
-    if (playerData.quests) {
-        renderList('list-daily', 'DAILY');
-        renderList('list-special', 'SPECIAL');
-        renderList('list-onetime', 'ONE_TIME');
-    }
-    
-    const logList = document.getElementById('logbook-list');
-    logList.innerHTML = "";
-    if (playerData.logbook) {
-        playerData.logbook.slice().reverse().forEach(e => {
-            logList.innerHTML += `<div class='log-entry'><span class="time">${e.time}</span> <span class="text">${e.msg}</span></div>`;
-        });
-    }
-}
-
-function renderList(id, type) {
-    const list = document.getElementById(id);
-    list.innerHTML = "";
-    const items = playerData.quests.filter(q => q.type === type);
-    if (items.length === 0) { list.innerHTML = `<p class="empty-msg">No quests.</p>`; return; }
-    
-    items.forEach(q => {
-        const cls = q.completed ? 'completed' : '';
-        let rewards = `XP: ${q.xp} | Gold: ${q.gold}`;
-        if (q.mana > 0) rewards += ` | Mana: ${q.mana}`;
-        
-        // HIER IS DE DELETE KNOP TOEGEVOEGD
-        list.innerHTML += `
-            <div class="quest-item ${cls}">
-                <div class="quest-info"><h4>${q.title}</h4><div class="quest-rewards">${rewards}</div></div>
-                <div class="quest-actions">
-                    <button class="delete-btn" onclick="deleteQuest(${q.id})">🗑️</button>
-                    <button class="checkbox-btn" onclick="toggleQuest(${q.id})"></button>
-                </div>
-            </div>`;
-    });
-}
-
 function showNotification(text) {
     const n = document.getElementById('notification-bar');
-    document.getElementById('notif-text').innerText = text;
-    n.classList.remove('hidden');
-    setTimeout(() => n.classList.add('hidden'), 5000);
+    if(n) {
+        document.getElementById('notif-text').innerText = text;
+        n.classList.remove('hidden');
+        setTimeout(() => n.classList.add('hidden'), 5000);
+    }
 }
 
-// Mana Convert, Modals, etc.
+// EVENTS
+document.getElementById('btn-login').addEventListener('click', () => {
+    const email = document.getElementById('email').value;
+    const pass = document.getElementById('password').value;
+    signInWithEmailAndPassword(auth, email, pass).catch(e => alert(e.message));
+});
+
+document.getElementById('btn-signup').addEventListener('click', async () => {
+    const email = document.getElementById('email').value;
+    const pass = document.getElementById('password').value;
+    try {
+        await createUserWithEmailAndPassword(auth, email, pass);
+    } catch (e) { alert(e.message); }
+});
+
 window.convertMana = async () => {
     const amount = parseInt(document.getElementById('convert-amount').value);
     if (!amount || amount <= 0) return;
     if (playerData.manaCrystals < amount) return alert("Not enough Mana!");
-    const usedMana = amount - (amount % 3);
-    const goldGained = usedMana / 3;
-    if (goldGained === 0) return alert("Need at least 3 Mana.");
-    playerData.manaCrystals -= usedMana;
-    playerData.gold += goldGained;
-    addToLog(`Shop: Traded ${usedMana} Mana for ${goldGained} Gold.`);
-    showNotification(`+${goldGained} Gold`);
+    
+    // HIER OOK DE MIN-CHECK
+    if (amount < 0) return alert("Positive numbers only!");
+
+    const used = amount - (amount % 3);
+    const gold = used / 3;
+    if (gold === 0) return alert("Need 3 Mana");
+    playerData.manaCrystals -= used;
+    playerData.gold += gold;
+    addToLog(`Shop: ${used} Mana -> ${gold} Gold`);
+    showNotification(`+${gold} Gold`);
     await saveToDB();
     closeModal('modal-convert');
     updateUI();
 };
 
-window.openQuestModal = (t) => { document.getElementById('new-quest-type').value = t; document.getElementById('modal-quest').classList.remove('hidden'); };
+window.openQuestModal = (t) => { 
+    document.getElementById('new-quest-title').value = "";
+    document.getElementById('new-quest-desc').value = "";
+    document.getElementById('new-quest-type').value = t; 
+    document.getElementById('modal-quest').classList.remove('hidden'); 
+};
 window.openConvertModal = () => { document.getElementById('convert-available').innerText = playerData.manaCrystals || 0; document.getElementById('modal-convert').classList.remove('hidden'); };
 window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
 window.logout = () => signOut(auth);
