@@ -1,4 +1,4 @@
-/* --- BASIS (BEHOUDEN) --- */
+/* --- BASIS --- */
 body {
     background-color: #0d0d12; color: #e0e0e0; font-family: 'Courier New', Courier, monospace;
     margin: 0; min-height: 100vh; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
@@ -62,10 +62,15 @@ body {
 .quest-item.completed { opacity: 0.5; border-left: 4px solid #444; }
 .quest-info h4 { margin: 0; font-size: 1rem; }
 .quest-rewards { font-size: 0.8em; color: #f1c40f; margin-top: 5px; }
+
+/* QUEST ACTIONS (Vinkje + Delete) */
+.quest-actions { display: flex; gap: 10px; align-items: center; }
 .checkbox-btn { width: 30px; height: 30px; border: 2px solid #3498db; background: transparent; cursor: pointer; border-radius: 50%; padding: 0; margin: 0; }
 .quest-item.completed .checkbox-btn { background: #3498db; }
+.delete-btn { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; padding: 0; width: auto; margin: 0; opacity: 0.6; }
+.delete-btn:hover { opacity: 1; transform: scale(1.1); }
 
-/* GATES & RAID CARDS (NIEUW) */
+/* GATES */
 .gate-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px; }
 .gate-btn { padding: 20px; font-size: 1em; background: #15151e; border: 1px solid #3498db; color: #3498db; margin-top: 0; }
 .gate-btn:hover { background: #3498db; color: white; }
@@ -76,7 +81,6 @@ body {
 .gate-info { font-size: 0.8em; color: #888; text-align: center; margin-top: 5px; }
 .divider { border: 0; border-top: 1px solid #333; margin: 30px 0; }
 
-/* Nieuwe stijl voor actieve raids */
 .raid-card {
     background: #15151e; border: 1px solid #f1c40f; padding: 15px;
     border-radius: 8px; margin-bottom: 10px; display: flex;
@@ -87,7 +91,6 @@ body {
 .raid-title { font-weight: bold; color: #f1c40f; font-size: 1.1em; }
 .raid-timer { color: #fff; font-family: monospace; font-size: 1.2em; margin-top: 5px; }
 .claim-btn { width: auto; margin: 0; padding: 10px 20px; background: #f1c40f; color: black; animation: pulse 1.5s infinite; font-size: 0.9em; }
-
 @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
 /* INPUTS */
@@ -99,7 +102,7 @@ button:active { transform: scale(0.98); }
 .secondary-btn { background: transparent; border: 1px solid #444; color: #aaa; }
 .danger-btn { background: #c0392b; margin-top: 40px; }
 
-/* MODALS & NOTIFICATION */
+/* MODALS */
 .logbook-container { margin-top: 30px; }
 .logbook-container h3 { border-bottom: 1px solid #333; padding-bottom: 10px; }
 .logbook-list { max-height: 300px; overflow-y: auto; border: 1px solid #333; padding: 15px; background: #0a0a0a; border-radius: 8px; }

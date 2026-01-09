@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// --- CONFIGURATIE (Plak hier je Key) ---
+// --- CONFIG ---
         const firebaseConfig = {
         apiKey: "AIzaSyAoP9XAGIu5sBxLHx8vjWCWjWS41ZURX30",
         authDomain: "solo-leveling-app-57b38.firebaseapp.com",
@@ -12,15 +12,16 @@ import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstati
         appId: "1:715704809890:web:69e2ba6af16d0933e39afb"
         };
 
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- GLOBAL VARIABLES ---
+// --- VARIABLES ---
 let playerData = null;
 let gateTimerInterval = null;
 
-// --- SPEL DATA (Gates & Ranks) ---
+// --- DATA ---
 const RANKS = [
     { name: "E-Rank", min: 0, max: 3000 },
     { name: "D-Rank", min: 3000, max: 6000 },
@@ -45,82 +46,37 @@ const GATE_DATA = {
     'BLUE': { time: 0.1 }
 };
 
-// --- AUTHENTICATIE LOGICA ---
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        // Ingelogd
-        document.getElementById('login-screen').classList.add('hidden');
-        document.getElementById('app-screen').classList.remove('hidden');
-        // We geven nu het hele user object mee (zodat we het emailadres hebben)
-        loadPlayerData(user);
-    } else {
-        // Uitgelogd
-        document.getElementById('login-screen').classList.remove('hidden');
-        document.getElementById('app-screen').classList.add('hidden');
-    }
-});
+// --- AUTH LOGIC (LOGIN & SIGNUP FIX) ---
 
-// --- ACCOUNT MAKEN & INLOGGEN ---
-// Deze staan nu expliciet hier om zeker te zijn dat ze laden
+// Inloggen
 document.getElementById('btn-login').addEventListener('click', () => {
     const email = document.getElementById('email').value;
     const pass = document.getElementById('password').value;
-    if(!email || !pass) return alert("Please fill in email and password.");
-    signInWithEmailAndPassword(auth, email, pass).catch(e => alert("Login Failed: " + e.message));
+    if(!email || !pass) return alert("Fill in all fields");
+    
+    document.getElementById('btn-login').innerText = "Loading...";
+    signInWithEmailAndPassword(auth, email, pass).catch(e => {
+        alert(e.message);
+        document.getElementById('btn-login').innerText = "Initialize System";
+    });
 });
 
-document.getElementById('btn-signup').addEventListener('click', () => {
+// Account Maken (NU MET EMAIL OPSLAG FIX)
+document.getElementById('btn-signup').addEventListener('click', async () => {
     const email = document.getElementById('email').value;
     const pass = document.getElementById('password').value;
-    if(!email || !pass) return alert("Please fill in email and password.");
-    
-    // Maak account in Firebase Auth
-    createUserWithEmailAndPassword(auth, email, pass)
-        .then((userCredential) => {
-            alert("Account Created! System Initializing...");
-            // onAuthStateChanged pikt dit vanzelf op
-        })
-        .catch((error) => {
-            alert("Signup Failed: " + error.message);
-        });
-});
+    if(!email || !pass) return alert("Fill in all fields");
 
-// --- DATA LADEN ---
-async function loadPlayerData(user) {
-    const userId = user.uid;
-    const userEmail = user.email; // Hier pakken we het emailadres
-    
-    const docRef = doc(db, "players", userId);
-    const docSnap = await getDoc(docRef);
+    document.getElementById('btn-signup').innerText = "Creating...";
 
-    if (docSnap.exists()) {
-        playerData = docSnap.data();
-        
-        // --- CHECK: Sla email op als die nog niet bestaat ---
-        if (!playerData.email) {
-            playerData.email = userEmail;
-            await saveToDB(); // Update database met email
-        }
+    try {
+        // 1. Maak user in Auth
+        const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+        const user = userCredential.user;
 
-        // --- SANITIZER (NaN Fixes) ---
-        if (isNaN(playerData.xp)) playerData.xp = 0; 
-        if (isNaN(playerData.gold)) playerData.gold = 0;
-        if (isNaN(playerData.manaCrystals)) playerData.manaCrystals = 0;
-
-        // Array checks
-        if (!playerData.activeGates) playerData.activeGates = [];
-        if (!playerData.quests) playerData.quests = [];
-        
-        // Brush Teeth check
-        if (!playerData.quests.some(q => q.title === "Brush Teeth")) {
-            playerData.quests.push({ id: Date.now(), title: "Brush Teeth", type: "DAILY", xp: 20, gold: 1, mana: 0, completed: false });
-            await saveToDB();
-        }
-
-    } else {
-        // --- NIEUWE SPELER AANMAKEN ---
-        playerData = {
-            email: userEmail, // HIER SLAAN WE HET EMAILADRES OP!
+        // 2. Maak DIRECT het document aan in Database met email
+        const newPlayerData = {
+            email: user.email, // Forceer email opslag
             rank: "E-Rank",
             xp: 0,
             gold: 0,
@@ -131,6 +87,72 @@ async function loadPlayerData(user) {
                 { id: Date.now(), title: "Brush Teeth", type: "DAILY", xp: 20, gold: 1, mana: 0, completed: false }
             ],
             logbook: [],
+            activeGates: []
+        };
+
+        await setDoc(doc(db, "players", user.uid), newPlayerData);
+        
+        // 3. Auth Listener doet de rest (scherm wisselen)
+
+    } catch (error) {
+        alert("Signup Error: " + error.message);
+        document.getElementById('btn-signup').innerText = "Create Account";
+    }
+});
+
+// Listener voor status wijziging
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('app-screen').classList.remove('hidden');
+        // Reset knop teksten
+        document.getElementById('btn-login').innerText = "Initialize System";
+        document.getElementById('btn-signup').innerText = "Create Account";
+        loadPlayerData(user);
+    } else {
+        document.getElementById('login-screen').classList.remove('hidden');
+        document.getElementById('app-screen').classList.add('hidden');
+    }
+});
+
+// --- DATA LOAD ---
+async function loadPlayerData(user) {
+    const docRef = doc(db, "players", user.uid);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+        playerData = docSnap.data();
+
+        // Check of email erin staat, zo niet, voeg toe
+        if (!playerData.email) {
+            playerData.email = user.email;
+            await saveToDB();
+        }
+
+        // Repareer NaN
+        if (isNaN(playerData.xp)) playerData.xp = 0; 
+        if (isNaN(playerData.gold)) playerData.gold = 0;
+        if (isNaN(playerData.manaCrystals)) playerData.manaCrystals = 0;
+
+        if (!playerData.activeGates) playerData.activeGates = [];
+        if (!playerData.quests) playerData.quests = [];
+        
+        // Brush Teeth Check
+        if (!playerData.quests.some(q => q.title === "Brush Teeth")) {
+            playerData.quests.push({ id: Date.now(), title: "Brush Teeth", type: "DAILY", xp: 20, gold: 1, mana: 0, completed: false });
+            await saveToDB();
+        }
+
+    } else {
+        // Fallback als document toch niet bestaat (zou niet moeten gebeuren door signup fix)
+        playerData = {
+            email: user.email,
+            rank: "E-Rank",
+            xp: 0,
+            gold: 0,
+            manaCrystals: 0,
+            lastLoginDate: new Date().toDateString(),
+            quests: [],
             activeGates: []
         };
         await setDoc(docRef, playerData);
@@ -156,11 +178,19 @@ async function checkDailyReset() {
     }
 }
 
-// --- GATE SYSTEM ---
+// --- GATE SYSTEM (SLOT FIX) ---
 window.startGate = async (rank) => {
+    // 1. SLOT CHECK (1 Rank, 1 Red, 1 Blue)
+    const activeRanked = playerData.activeGates.find(g => !['RED', 'BLUE'].includes(g.rank));
+    const activeRed = playerData.activeGates.find(g => g.rank === 'RED');
+    const activeBlue = playerData.activeGates.find(g => g.rank === 'BLUE');
+
+    if (rank === 'RED' && activeRed) return alert("Red Gate already active!");
+    if (rank === 'BLUE' && activeBlue) return alert("Blue Gate already active!");
+    if (rank !== 'RED' && rank !== 'BLUE' && activeRanked) return alert("You are already exploring a Ranked Gate!");
+
+    // 2. LEVEL CHECK
     const userRankIndex = RANKS.findIndex(r => r.name === playerData.rank);
-    
-    // Rank Check
     if (rank !== 'RED' && rank !== 'BLUE') {
         const gateInfo = GATE_DATA[rank];
         if (userRankIndex < gateInfo.reqRankIdx) {
@@ -168,15 +198,13 @@ window.startGate = async (rank) => {
         }
     }
 
-    // Blue Gate Check
+    // 3. DAILY BLUE CHECK
     if (rank === 'BLUE') {
         const today = new Date().toDateString();
-        if (playerData.lastBlueGateDate === today) {
-            return alert("Daily Limit Reached (1/day). Reset at 00:00.");
-        }
+        if (playerData.lastBlueGateDate === today) return alert("Daily Limit Reached (1/day).");
     }
 
-    // Tijd
+    // 4. TIJD
     let durationMinutes = 5; 
     if (GATE_DATA[rank]) {
         const min = GATE_DATA[rank].minTime || GATE_DATA[rank].time;
@@ -210,7 +238,6 @@ window.claimGateReward = async (raidId) => {
     
     let xpGain = 0, goldGain = 0, manaGain = 0, success = false;
 
-    // Loot Logic
     if (rank === 'BLUE') {
         success = true;
         const roll = Math.random() * 100;
@@ -248,63 +275,7 @@ window.claimGateReward = async (raidId) => {
     renderActiveRaids();
 };
 
-function startTimerLoop() {
-    if (gateTimerInterval) clearInterval(gateTimerInterval);
-    gateTimerInterval = setInterval(() => {
-        if (!playerData.activeGates || playerData.activeGates.length === 0) return;
-        renderActiveRaids();
-    }, 1000);
-    renderActiveRaids();
-}
-
-function renderActiveRaids() {
-    const container = document.getElementById('active-raids-container');
-    container.innerHTML = "";
-    if (!playerData.activeGates || playerData.activeGates.length === 0) return;
-
-    const now = Date.now();
-    playerData.activeGates.forEach(raid => {
-        const timeLeft = raid.endTime - now;
-        let html = "";
-        
-        if (timeLeft <= 0) {
-            html = `
-            <div class="raid-card" style="border-color: #f1c40f;">
-                <div class="raid-info"><span class="raid-title">${raid.rank}-Rank Gate</span><span class="raid-timer" style="color:#f1c40f">DONE</span></div>
-                <button class="claim-btn" onclick="claimGateReward(${raid.id})">CLAIM</button>
-            </div>`;
-        } else {
-            const m = Math.floor((timeLeft / 1000 / 60) % 60);
-            const s = Math.floor((timeLeft / 1000) % 60);
-            html = `
-            <div class="raid-card">
-                <div class="raid-info"><span class="raid-title">${raid.rank}-Rank Gate</span><span class="raid-timer">${m}:${s.toString().padStart(2,'0')}</span></div>
-                <span style="color:#888; font-size:0.8em;">EXPLORING...</span>
-            </div>`;
-        }
-        container.innerHTML += html;
-    });
-}
-
-// --- MANA & QUESTS ---
-window.convertMana = async () => {
-    const amount = parseInt(document.getElementById('convert-amount').value);
-    if (!amount || amount <= 0) return;
-    if (playerData.manaCrystals < amount) return alert("Not enough Mana!");
-    
-    const usedMana = amount - (amount % 3);
-    const goldGained = usedMana / 3;
-    if (goldGained === 0) return alert("Need at least 3 Mana.");
-
-    playerData.manaCrystals -= usedMana;
-    playerData.gold += goldGained;
-    addToLog(`Shop: Traded ${usedMana} Mana for ${goldGained} Gold.`);
-    showNotification(`+${goldGained} Gold`);
-    await saveToDB();
-    closeModal('modal-convert');
-    updateUI();
-};
-
+// --- QUESTS (DELETE FUNCTIE) ---
 window.saveNewQuest = async () => {
     const title = document.getElementById('new-quest-title').value;
     const xp = parseInt(document.getElementById('new-quest-xp').value) || 0;
@@ -330,7 +301,15 @@ window.toggleQuest = async (id) => {
     updateUI();
 };
 
-// --- HELPERS ---
+// NIEUWE FUNCTIE: VERWIJDEREN
+window.deleteQuest = async (id) => {
+    if(!confirm("Delete this quest?")) return;
+    playerData.quests = playerData.quests.filter(q => q.id !== id);
+    await saveToDB();
+    updateUI();
+};
+
+// --- HELPERS & UI ---
 function addRewards(xp, gold, mana, reason) {
     playerData.xp += xp;
     playerData.gold += gold;
@@ -349,7 +328,6 @@ function addRewards(xp, gold, mana, reason) {
     let notifText = `+${xp} XP | +${gold} Gold`;
     if (mana > 0) notifText += ` | +${mana} Mana`;
     showNotification(notifText);
-    
     const details = `(+${xp}XP, +${gold}G${mana ? `, +${mana}Mana` : ''})`;
     addToLog(`${reason} ${details}`);
 }
@@ -366,11 +344,40 @@ async function saveToDB() {
     await updateDoc(docRef, playerData);
 }
 
-function showNotification(text) {
-    const n = document.getElementById('notification-bar');
-    document.getElementById('notif-text').innerText = text;
-    n.classList.remove('hidden');
-    setTimeout(() => n.classList.add('hidden'), 5000);
+function startTimerLoop() {
+    if (gateTimerInterval) clearInterval(gateTimerInterval);
+    gateTimerInterval = setInterval(() => {
+        if (!playerData.activeGates || playerData.activeGates.length === 0) return;
+        renderActiveRaids();
+    }, 1000);
+    renderActiveRaids();
+}
+
+function renderActiveRaids() {
+    const container = document.getElementById('active-raids-container');
+    container.innerHTML = "";
+    if (!playerData.activeGates || playerData.activeGates.length === 0) return;
+    const now = Date.now();
+    playerData.activeGates.forEach(raid => {
+        const timeLeft = raid.endTime - now;
+        let html = "";
+        if (timeLeft <= 0) {
+            html = `
+            <div class="raid-card" style="border-color: #f1c40f;">
+                <div class="raid-info"><span class="raid-title">${raid.rank}-Rank Gate</span><span class="raid-timer" style="color:#f1c40f">DONE</span></div>
+                <button class="claim-btn" onclick="claimGateReward(${raid.id})">CLAIM</button>
+            </div>`;
+        } else {
+            const m = Math.floor((timeLeft / 1000 / 60) % 60);
+            const s = Math.floor((timeLeft / 1000) % 60);
+            html = `
+            <div class="raid-card">
+                <div class="raid-info"><span class="raid-title">${raid.rank}-Rank Gate</span><span class="raid-timer">${m}:${s.toString().padStart(2,'0')}</span></div>
+                <span style="color:#888; font-size:0.8em;">EXPLORING...</span>
+            </div>`;
+        }
+        container.innerHTML += html;
+    });
 }
 
 function updateUI() {
@@ -414,15 +421,42 @@ function renderList(id, type) {
         let rewards = `XP: ${q.xp} | Gold: ${q.gold}`;
         if (q.mana > 0) rewards += ` | Mana: ${q.mana}`;
         
+        // HIER IS DE DELETE KNOP TOEGEVOEGD
         list.innerHTML += `
             <div class="quest-item ${cls}">
                 <div class="quest-info"><h4>${q.title}</h4><div class="quest-rewards">${rewards}</div></div>
-                <button class="checkbox-btn" onclick="toggleQuest(${q.id})"></button>
+                <div class="quest-actions">
+                    <button class="delete-btn" onclick="deleteQuest(${q.id})">🗑️</button>
+                    <button class="checkbox-btn" onclick="toggleQuest(${q.id})"></button>
+                </div>
             </div>`;
     });
 }
 
-// --- EVENT LISTENERS ---
+function showNotification(text) {
+    const n = document.getElementById('notification-bar');
+    document.getElementById('notif-text').innerText = text;
+    n.classList.remove('hidden');
+    setTimeout(() => n.classList.add('hidden'), 5000);
+}
+
+// Mana Convert, Modals, etc.
+window.convertMana = async () => {
+    const amount = parseInt(document.getElementById('convert-amount').value);
+    if (!amount || amount <= 0) return;
+    if (playerData.manaCrystals < amount) return alert("Not enough Mana!");
+    const usedMana = amount - (amount % 3);
+    const goldGained = usedMana / 3;
+    if (goldGained === 0) return alert("Need at least 3 Mana.");
+    playerData.manaCrystals -= usedMana;
+    playerData.gold += goldGained;
+    addToLog(`Shop: Traded ${usedMana} Mana for ${goldGained} Gold.`);
+    showNotification(`+${goldGained} Gold`);
+    await saveToDB();
+    closeModal('modal-convert');
+    updateUI();
+};
+
 window.openQuestModal = (t) => { document.getElementById('new-quest-type').value = t; document.getElementById('modal-quest').classList.remove('hidden'); };
 window.openConvertModal = () => { document.getElementById('convert-available').innerText = playerData.manaCrystals || 0; document.getElementById('modal-convert').classList.remove('hidden'); };
 window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
