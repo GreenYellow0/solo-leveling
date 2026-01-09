@@ -20,7 +20,7 @@ const db = getFirestore(app);
 let playerData = null;
 let gateTimerInterval = null;
 
-// GATE SETTINGS (Tijd in minuten, Crystals)
+// GATE SETTINGS
 const GATE_DATA = {
     'E': { minTime: 2, maxTime: 10, xp: 50, gold: 10, maxMana: 5, chance: 0.9 },
     'D': { minTime: 2, maxTime: 10, xp: 100, gold: 15, maxMana: 8, chance: 0.8 },
@@ -30,8 +30,8 @@ const GATE_DATA = {
     'S': { minTime: 30, maxTime: 30, xp: 300, gold: 40, maxMana: 50, chance: 0.75 },
     'SS': { minTime: 60, maxTime: 60, xp: 400, gold: 50, maxMana: 100, chance: 0.70 },
     'SSS': { minTime: 120, maxTime: 120, xp: 1000, gold: 100, maxMana: 250, chance: 0.60 },
-    'RED': { time: 0.1, xp: 200, gold: 0, minMana: 20, maxMana: 150, chance: 0.25 }, // Test: 0.1 min (6 sec)
-    'BLUE': { time: 0.1, chance: 1.0 } // Random rewards logic apart
+    'RED': { time: 0.1, xp: 200, gold: 0, minMana: 20, maxMana: 150, chance: 0.25 },
+    'BLUE': { time: 0.1, chance: 1.0 }
 };
 
 const RANKS = [
@@ -65,11 +65,11 @@ async function loadPlayerData(userId) {
     if (docSnap.exists()) {
         playerData = docSnap.data();
         
-        // FIX: Als quests leeg zijn (oud account), voeg Brush Teeth toe
-        if (!playerData.quests || playerData.quests.length === 0) {
-            playerData.quests = [
-                { id: Date.now(), title: "Brush Teeth", type: "DAILY", xp: 20, gold: 1, mana: 0, completed: false }
-            ];
+        // FIX: Check of de specifieke quest er is. Zo niet, voeg toe.
+        const hasBrushQuest = playerData.quests && playerData.quests.some(q => q.title === "Brush Teeth");
+        if (!hasBrushQuest) {
+            if (!playerData.quests) playerData.quests = [];
+            playerData.quests.push({ id: Date.now(), title: "Brush Teeth", type: "DAILY", xp: 20, gold: 1, mana: 0, completed: false });
             await saveToDB();
         }
 
@@ -83,18 +83,23 @@ async function loadPlayerData(userId) {
             quests: [
                 { id: Date.now(), title: "Brush Teeth", type: "DAILY", xp: 20, gold: 1, mana: 0, completed: false }
             ],
-            logbook: []
+            logbook: [],
+            activeGates: [] // NIEUW: Array voor meerdere gates
         };
         await setDoc(docRef, playerData);
     }
 
+    // Migratie fix: Als oud account nog enkele 'activeGate' heeft, zet om naar array
+    if (playerData.activeGate && !playerData.activeGates) {
+        playerData.activeGates = [playerData.activeGate];
+        delete playerData.activeGate;
+        await saveToDB();
+    }
+    if (!playerData.activeGates) playerData.activeGates = [];
+
     checkDailyReset();
     updateUI();
-    
-    // Start Timer Interval als er een gate actief is
-    if (playerData.activeGate) {
-        startTimerLoop();
-    }
+    startTimerLoop();
 }
 
 async function checkDailyReset() {
@@ -112,31 +117,26 @@ async function checkDailyReset() {
     }
 }
 
-// --- GATE SYSTEM (LOGIC) ---
+// --- MULTI GATE SYSTEM ---
 window.startGate = async (rank) => {
-    // 1. Check if busy
-    if (playerData.activeGate) {
-        return alert("You are already exploring a gate!");
-    }
-
-    // 2. Check Logic (Hier later Rank check toevoegen)
+    // Geen limiet meer op aantal gates, maar je mag maar 1 van dezelfde rank tegelijk doen (optioneel)
     
-    // 3. Bereken Tijd (Simpel gehouden voor nu)
-    let durationMinutes = 5; // Default
+    // Tijd berekenen
+    let durationMinutes = 5; 
     if (GATE_DATA[rank]) {
-        // Pak een random tijd tussen min en max
         const min = GATE_DATA[rank].minTime || GATE_DATA[rank].time;
         const max = GATE_DATA[rank].maxTime || GATE_DATA[rank].time;
         durationMinutes = Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
-    // 4. Start Gate
     const endTime = Date.now() + (durationMinutes * 60 * 1000);
     
-    playerData.activeGate = {
+    // Voeg toe aan ARRAY
+    playerData.activeGates.push({
+        id: Date.now(), // Unieke ID voor deze raid
         rank: rank,
         endTime: endTime
-    };
+    });
 
     addToLog(`Gate: Started ${rank}-Rank Gate (${durationMinutes} min).`);
     await saveToDB();
@@ -144,13 +144,15 @@ window.startGate = async (rank) => {
     startTimerLoop();
 };
 
-window.claimGateReward = async () => {
-    if (!playerData.activeGate) return;
+window.claimGateReward = async (raidId) => {
+    const raidIndex = playerData.activeGates.findIndex(g => g.id === raidId);
+    if (raidIndex === -1) return;
     
-    const rank = playerData.activeGate.rank;
+    const raid = playerData.activeGates[raidIndex];
+    const rank = raid.rank;
     const gateInfo = GATE_DATA[rank];
     
-    // Bereken Loot
+    // Loot Check
     const success = Math.random() <= gateInfo.chance;
     
     if (success) {
@@ -161,62 +163,76 @@ window.claimGateReward = async () => {
         showNotification("Raid Failed...");
     }
 
-    // Reset Gate
-    playerData.activeGate = null;
+    // Verwijder uit array
+    playerData.activeGates.splice(raidIndex, 1);
+    
     await saveToDB();
     updateUI();
 };
 
 function startTimerLoop() {
     if (gateTimerInterval) clearInterval(gateTimerInterval);
-    
     gateTimerInterval = setInterval(() => {
-        if (!playerData.activeGate) {
-            clearInterval(gateTimerInterval);
-            return;
+        if (!playerData.activeGates || playerData.activeGates.length === 0) {
+            // Niet stoppen, want misschien start je er zo een
+            return; 
         }
-        updateGateUI();
+        renderActiveRaids();
     }, 1000);
-    updateGateUI(); // Direct 1x aanroepen
+    renderActiveRaids();
 }
 
-function updateGateUI() {
-    const now = Date.now();
-    const timeLeft = playerData.activeGate.endTime - now;
+function renderActiveRaids() {
+    const container = document.getElementById('active-raids-container');
+    container.innerHTML = "";
     
-    const timerDisplay = document.getElementById('gate-timer');
-    const claimBtn = document.getElementById('btn-claim-gate');
-    const title = document.getElementById('gate-timer-title');
+    if (!playerData.activeGates || playerData.activeGates.length === 0) return;
 
-    if (timeLeft <= 0) {
-        // KLAAR!
-        timerDisplay.innerText = "00:00";
-        title.innerText = "Dungeon Cleared!";
-        claimBtn.classList.remove('hidden');
-    } else {
-        // NOG BEZIG
-        const m = Math.floor((timeLeft / 1000 / 60) % 60);
-        const s = Math.floor((timeLeft / 1000) % 60);
-        timerDisplay.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-        title.innerText = `Exploring ${playerData.activeGate.rank}-Rank Gate...`;
-        claimBtn.classList.add('hidden');
-    }
+    const now = Date.now();
+
+    playerData.activeGates.forEach(raid => {
+        const timeLeft = raid.endTime - now;
+        let html = "";
+        
+        if (timeLeft <= 0) {
+            // READY TO CLAIM
+            html = `
+            <div class="raid-card">
+                <div class="raid-info">
+                    <span class="raid-title">${raid.rank}-Rank Gate</span>
+                    <span class="raid-timer" style="color:#f1c40f">DONE</span>
+                </div>
+                <button class="claim-btn" onclick="claimGateReward(${raid.id})">CLAIM</button>
+            </div>`;
+        } else {
+            // RUNNING
+            const m = Math.floor((timeLeft / 1000 / 60) % 60);
+            const s = Math.floor((timeLeft / 1000) % 60);
+            const timeString = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            
+            html = `
+            <div class="raid-card">
+                <div class="raid-info">
+                    <span class="raid-title">${raid.rank}-Rank Gate</span>
+                    <span class="raid-timer">${timeString}</span>
+                </div>
+                <span style="color:#888; font-size:0.8em;">EXPLORING...</span>
+            </div>`;
+        }
+        container.innerHTML += html;
+    });
 }
 
-// --- MANA FIX ---
+// --- MANA & SHOP ---
 window.convertMana = async () => {
     const amount = parseInt(document.getElementById('convert-amount').value);
     if (!amount || amount <= 0) return;
-    
     if (playerData.manaCrystals < amount) return alert("Not enough Mana!");
+    const usedMana = amount - (amount % 3);
+    const goldGained = usedMana / 3;
+    if (goldGained === 0) return alert("Need at least 3 Mana.");
 
-    // Bereken hoeveel we ECHT gebruiken (veelvouden van 3)
-    const usedMana = amount - (amount % 3); // 7 -> 6
-    const goldGained = usedMana / 3;        // 6 / 3 = 2
-    
-    if (goldGained === 0) return alert("Need at least 3 Mana to trade.");
-
-    playerData.manaCrystals -= usedMana; // We pakken alleen de 6 af
+    playerData.manaCrystals -= usedMana;
     playerData.gold += goldGained;
     
     addToLog(`Shop: Traded ${usedMana} Mana for ${goldGained} Gold.`);
@@ -236,11 +252,7 @@ window.saveNewQuest = async () => {
     const type = document.getElementById('new-quest-type').value;
 
     if (!title) return alert("Title required");
-
-    const newQuest = {
-        id: Date.now(), title, type, xp, gold, mana, completed: false
-    };
-
+    const newQuest = { id: Date.now(), title, type, xp, gold, mana, completed: false };
     if (!playerData.quests) playerData.quests = [];
     playerData.quests.push(newQuest);
     await saveToDB();
@@ -257,13 +269,12 @@ window.toggleQuest = async (id) => {
     updateUI();
 };
 
-// --- HELPERS ---
+// --- HELPERS (LOG FIX: Nu met details!) ---
 function addRewards(xp, gold, mana, reason) {
     playerData.xp += xp;
     playerData.gold += gold;
     if (mana) playerData.manaCrystals += mana;
 
-    // Check Rank logic (verkort voor overzicht)
     const curRank = RANKS.find(r => r.name === playerData.rank);
     if (curRank && playerData.xp >= curRank.max) {
         const next = RANKS.find(r => r.min === curRank.max);
@@ -274,12 +285,13 @@ function addRewards(xp, gold, mana, reason) {
         }
     }
     
-    // FIX: Notificatie toont nu ook Mana
     let notifText = `+${xp} XP | +${gold} Gold`;
     if (mana > 0) notifText += ` | +${mana} Mana`;
     showNotification(notifText);
     
-    addToLog(reason);
+    // LOGBOEK DETAIL FIX
+    const details = `(+${xp} XP, +${gold} Gold${mana ? `, +${mana} Mana` : ''})`;
+    addToLog(`${reason} ${details}`);
 }
 
 function addToLog(msg) {
@@ -303,34 +315,23 @@ function showNotification(text) {
 
 // --- UI UPDATE ---
 function updateUI() {
-    // Stats
     document.getElementById('display-rank').innerText = playerData.rank;
     document.getElementById('display-xp').innerText = playerData.xp;
     document.getElementById('display-gold').innerText = playerData.gold;
     document.getElementById('display-mana').innerText = (playerData.manaCrystals || 0) + " 💎";
     
-    // Shop
+    const currentRank = RANKS.find(r => r.name === playerData.rank);
+    if (currentRank) document.getElementById('display-next').innerText = currentRank.max;
+
     document.getElementById('shop-gold').innerText = playerData.gold;
     document.getElementById('shop-mana').innerText = (playerData.manaCrystals || 0);
 
-    // Gate UI Toggle
-    if (playerData.activeGate) {
-        document.getElementById('active-gate-panel').classList.remove('hidden');
-        document.getElementById('gate-selection-grid').classList.add('hidden');
-        updateGateUI(); // Direct timer updaten
-    } else {
-        document.getElementById('active-gate-panel').classList.add('hidden');
-        document.getElementById('gate-selection-grid').classList.remove('hidden');
-    }
-
-    // Quests
     if (playerData.quests) {
         renderList('list-daily', 'DAILY');
         renderList('list-special', 'SPECIAL');
         renderList('list-onetime', 'ONE_TIME');
     }
     
-    // Logs
     const logList = document.getElementById('logbook-list');
     logList.innerHTML = "";
     if (playerData.logbook) {
@@ -363,21 +364,16 @@ function renderList(id, type) {
 window.openQuestModal = (t) => { document.getElementById('new-quest-type').value = t; document.getElementById('modal-quest').classList.remove('hidden'); };
 window.openConvertModal = () => { document.getElementById('convert-available').innerText = playerData.manaCrystals || 0; document.getElementById('modal-convert').classList.remove('hidden'); };
 window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
-
 document.getElementById('btn-login').addEventListener('click', () => {
     const email = document.getElementById('email').value; const pass = document.getElementById('password').value;
     signInWithEmailAndPassword(auth, email, pass).catch(e => alert(e.message));
 });
 window.logout = () => signOut(auth);
-
-// NAV SWITCH FIX
 window.switchTab = (tabName) => {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active-tab'));
     document.getElementById('tab-' + tabName).classList.add('active-tab');
-    
     document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-    document.getElementById('nav-' + tabName).classList.add('active'); // GEBRUIKT NU DE ID
-    
+    document.getElementById('nav-' + tabName).classList.add('active');
     document.getElementById('nav-menu').classList.remove('active');
 };
 document.getElementById('hamburger-btn').addEventListener('click', () => document.getElementById('nav-menu').classList.toggle('active'));
