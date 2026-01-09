@@ -2,72 +2,28 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0d0d12">
     <title>Solo Leveling System</title>
-    <style>
-        /* Solo Leveling Stijl (Dark Mode) */
-        body {
-            background-color: #0d0d12;
-            color: #e0e0e0;
-            font-family: 'Courier New', Courier, monospace; /* System font style */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .container {
-            width: 90%;
-            max-width: 400px;
-            text-align: center;
-            border: 1px solid #1f3a93; /* Blauwe gloed */
-            padding: 20px;
-            box-shadow: 0 0 15px rgba(31, 58, 147, 0.5);
-            border-radius: 5px;
-        }
-        h1 { color: #3498db; text-transform: uppercase; letter-spacing: 2px; }
-        input {
-            display: block;
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            background: #1a1a24;
-            border: 1px solid #3498db;
-            color: white;
-            box-sizing: border-box; 
-        }
-        button {
-            width: 100%;
-            padding: 10px;
-            background: #1f3a93;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        button:hover { background: #3498db; }
-        .hidden { display: none; }
-        .status-box {
-            text-align: left;
-            border-top: 1px solid #333;
-            margin-top: 20px;
-            padding-top: 10px;
-        }
-        .rank { color: #f1c40f; font-size: 1.2em; font-weight: bold; }
-        .error { color: #e74c3c; font-size: 0.8em; margin-top: 5px; }
-    </style>
+    
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <div class="container">
         <div id="login-screen">
             <h1>System Login</h1>
-            <input type="email" id="email" placeholder="Email">
-            <input type="password" id="password" placeholder="Password">
+            <div class="input-group">
+                <input type="email" id="email" placeholder="Email" inputmode="email">
+            </div>
+            <div class="input-group">
+                <input type="password" id="password" placeholder="Password">
+            </div>
             <button id="btn-login">Initialize System</button>
-            <button id="btn-signup" style="background:#333; margin-top:5px;">Create Account</button>
+            <button id="btn-signup" class="secondary-btn">Create Account</button>
             <p id="error-msg" class="error"></p>
         </div>
 
@@ -81,106 +37,10 @@
                 <p>GOLD: <span id="display-gold">0</span></p>
             </div>
 
-            <button onclick="logout()" style="margin-top: 20px; background: #c0392b;">Log Out</button>
+            <button onclick="logout()" class="danger-btn">Log Out</button>
         </div>
     </div>
 
-    <script type="module">
-        // Importeer de functies die we nodig hebben
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-        // --------------------------------------------------------------
-        // STAP: PLAK HIER ONDER JOUW CONFIG (Vervang de haakjes {})
-        // --------------------------------------------------------------
-        const firebaseConfig = {
-        apiKey: "AIzaSyAoP9XAGIu5sBxLHx8vjWCWjWS41ZURX30",
-        authDomain: "solo-leveling-app-57b38.firebaseapp.com",
-        projectId: "solo-leveling-app-57b38",
-        storageBucket: "solo-leveling-app-57b38.firebasestorage.app",
-        messagingSenderId: "715704809890",
-        appId: "1:715704809890:web:69e2ba6af16d0933e39afb"
-        };
-
-        // Start Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        // --- VARIABELEN ---
-        const loginScreen = document.getElementById('login-screen');
-        const appScreen = document.getElementById('app-screen');
-        const errorMsg = document.getElementById('error-msg');
-
-        // --- FUNCTIES ---
-
-        // 1. Check of gebruiker is ingelogd
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                // Gebruiker is ingelogd
-                loginScreen.classList.add('hidden');
-                appScreen.classList.remove('hidden');
-                loadPlayerData(user.uid);
-            } else {
-                // Gebruiker is niet ingelogd
-                loginScreen.classList.remove('hidden');
-                appScreen.classList.add('hidden');
-            }
-        });
-
-        // 2. Data ophalen uit Database
-        async function loadPlayerData(userId) {
-            const docRef = doc(db, "players", userId);
-            const docSnap = await getDoc(docRef);
-
-            if (docSnap.exists()) {
-                // Data bestaat, update het scherm
-                const data = docSnap.data();
-                updateUI(data);
-            } else {
-                // Nieuw account? Maak standaard E-Rank aan
-                const defaultData = {
-                    rank: "E-Rank",
-                    xp: 0,
-                    gold: 0,
-                    manaCrystals: 0,
-                    dailyQuestsDone: []
-                };
-                await setDoc(docRef, defaultData);
-                updateUI(defaultData);
-            }
-        }
-
-        // 3. Scherm updaten
-        function updateUI(data) {
-            document.getElementById('display-rank').innerText = data.rank;
-            document.getElementById('display-xp').innerText = data.xp;
-            document.getElementById('display-gold').innerText = data.gold;
-            // Hier komt later logica voor hoeveel XP nodig is voor volgende rank
-            document.getElementById('display-next').innerText = "3000"; 
-        }
-
-        // 4. Knoppen Logica
-        document.getElementById('btn-login').addEventListener('click', () => {
-            const email = document.getElementById('email').value;
-            const pass = document.getElementById('password').value;
-            signInWithEmailAndPassword(auth, email, pass).catch((error) => {
-                errorMsg.innerText = error.message;
-            });
-        });
-
-        document.getElementById('btn-signup').addEventListener('click', () => {
-            const email = document.getElementById('email').value;
-            const pass = document.getElementById('password').value;
-            createUserWithEmailAndPassword(auth, email, pass).catch((error) => {
-                errorMsg.innerText = error.message;
-            });
-        });
-
-        // Maak logout globaal beschikbaar
-        window.logout = () => signOut(auth);
-
-    </script>
+    <script type="module" src="game.js"></script>
 </body>
 </html>

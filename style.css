@@ -1,0 +1,98 @@
+/* Solo Leveling Stijl - Mobile Optimized */
+body {
+    background-color: #0d0d12;
+    color: #e0e0e0;
+    font-family: 'Courier New', Courier, monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh; /* Volledige hoogte */
+    height: -webkit-fill-available; /* Fix voor iPhone safari balk */
+    margin: 0;
+    /* Zorgt voor ruimte bij de notch van iPhone */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    overflow: hidden; /* Geen scrollen op login scherm */
+}
+
+.container {
+    width: 85%;
+    max-width: 400px;
+    text-align: center;
+    border: 1px solid #1f3a93;
+    padding: 25px;
+    box-shadow: 0 0 20px rgba(31, 58, 147, 0.4);
+    border-radius: 12px; /* Iets rondere hoeken, voelt moderner */
+    background: #0d0d12;
+}
+
+h1 { 
+    color: #3498db; 
+    text-transform: uppercase; 
+    letter-spacing: 2px;
+    margin-bottom: 30px;
+    font-size: 1.5rem;
+}
+
+/* Input velden optimalisatie voor mobiel */
+input {
+    display: block;
+    width: 100%;
+    padding: 15px; /* Groter raakvlak */
+    margin: 10px 0;
+    background: #1a1a24;
+    border: 1px solid #3498db;
+    color: white;
+    box-sizing: border-box; 
+    border-radius: 8px;
+    font-size: 16px; /* CRUCIAAL: Voorkomt inzoomen op iPhone */
+    outline: none;
+}
+
+input:focus {
+    border-color: #f1c40f;
+    box-shadow: 0 0 8px rgba(241, 196, 15, 0.3);
+}
+
+button {
+    width: 100%;
+    padding: 15px;
+    margin-top: 15px;
+    background: #1f3a93;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    text-transform: uppercase;
+    border-radius: 8px;
+    font-size: 1rem;
+    touch-action: manipulation; /* Sneller reageren op tikken */
+}
+
+button:active {
+    transform: scale(0.98); /* Klik effect */
+}
+
+.secondary-btn {
+    background: transparent;
+    border: 1px solid #333;
+    color: #888;
+}
+
+.danger-btn {
+    background: #c0392b;
+    margin-top: 30px;
+}
+
+.hidden { display: none; }
+
+.status-box {
+    text-align: left;
+    border-top: 1px solid #333;
+    margin-top: 20px;
+    padding-top: 15px;
+}
+
+.rank { color: #f1c40f; font-size: 1.4em; font-weight: bold; }
+.error { color: #e74c3c; font-size: 0.9em; margin-top: 15px; }
